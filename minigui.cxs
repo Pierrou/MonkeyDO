@@ -1,0 +1,872 @@
+﻿Import angelfont.angelfont
+Import mojo.graphics
+Import mojo.input
+Import druggedbunny.autofit2.autofit
+Import os
+
+Function HitBouton:Bool(x:Float, y:Float, largeur:Float, hauteur:Float)
+	Local okdown:Bool
+	If VMouseX() > x And VMouseY() > y
+		If VMouseX() < x + largeur And VMouseY() < y + hauteur
+			okdown = True
+		EndIf
+	EndIf
+	Return okdown
+	
+End
+Function ShuffleTab:Int(tableau:String[]) '
+	Local tabprovisoire:String[] = tableau
+	For Local iiii:Int = 0 To tabprovisoire.Length - 1
+		Print "tabprov " + iiii + " " + tabprovisoire[iiii]
+		Print "tableau "+ iiii+ " "+tableau[iiii]
+	Next
+	tabprovisoire = tabprovisoire[ .. tableau.Length]
+	Local nombreitemsrestants:Int = tabprovisoire.Length 'le nombre d'items encore pas utilisés dans le tableau de base
+	For Local boucle2:Int = 0 To tabprovisoire.Length - 1 'on va piocher une case au hasard à chaque fois dans tabprovisoire on copie au fur et à mesure dans le tableau et on rapproche dans tabprovisoire tous les items après celui utilisé
+		Local numeroitemhasard:Int = Rnd(nombreitemsrestants)
+		tableau[boucle2] = tabprovisoire[numeroitemhasard]
+		For Local boucle3:Int = numeroitemhasard To nombreitemsrestants - 2
+			tabprovisoire[boucle3] = tabprovisoire[boucle3 + 1] ' si le numeroitemhasard est 2, on copie 3 sur 2 puis 4 sur 3, etc.
+		Next
+		nombreitemsrestants = nombreitemsrestants - 1
+	Next
+	Return 0
+End
+Class TexteAModifier
+	Field texteamod:String
+	Field policemodif:AngelFont
+	Field x:Float
+	Field y:Float
+	Field largeur:Float
+	Field hauteur:Float
+	Field modetapetexte:Bool
+	Field enmaj:Bool = False
+	Field circonflexe:Bool = False
+	Field trema:Bool = False
+	Method New(x:Float, y:Float, police:AngelFont, nom:String)
+		Self.x = x
+		Self.y = y
+		Self.texteamod = nom
+		Self.policemodif = police
+		Self.largeur = police.TextWidth(nom)
+		Self.hauteur = police.height
+		
+	End
+	Method TestPresse:Bool()
+		Local okdown:Bool = False
+		If MouseHit(0)
+			okdown = HitBouton(Self.x, Self.y, Self.largeur, Self.hauteur)
+		EndIf
+		If okdown = True
+			ResetInput
+
+			Self.modetapetexte = True
+			Self.texteamod = ""
+		EndIf
+		Return okdown
+	End
+	
+	Method Draw:Int()
+		SetColor 10, 10, 50
+		If Self.modetapetexte = False
+			Self.policemodif.DrawText(Self.texteamod, Self.x, Self.y)
+		Else
+			Self.policemodif.DrawText(Self.texteamod + "|", Self.x, Self.y)
+		EndIf
+		SetColor 255,255,255
+		Return 0
+	End
+	
+	Method TapeTexte:Int(limite:Int, defaut:String)
+		If KeyDown(KEY_SHIFT) Then Self.enmaj = True Else Self.enmaj = False
+		If Self.largeur < limite
+			If KeyHit(KEY_OPENBRACKET) And Self.enmaj = False
+				If Self.circonflexe = True Then Self.circonflexe = False Else circonflexe = True
+			ElseIf KeyHit(KEY_OPENBRACKET) And Self.enmaj = True
+				If Self.trema = True Then Self.circonflexe = False Else trema = True
+
+			ElseIf KeyHit(KEY_A)
+				If Self.enmaj = False
+					Self.texteamod = Self.texteamod + "q"
+				Else
+					Self.texteamod = Self.texteamod + "Q"
+				EndIf
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+				circonflexe = False
+				trema = False
+			ElseIf KeyHit(KEY_B)
+				If Self.enmaj = False
+					Self.texteamod = Self.texteamod + "b"
+				Else
+					Self.texteamod = Self.texteamod + "B"
+				EndIf
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+				circonflexe = False
+				trema = False
+
+			ElseIf KeyHit(KEY_C)
+				If Self.enmaj = False
+					Self.texteamod = Self.texteamod + "c"
+				Else
+					Self.texteamod = Self.texteamod + "C"
+				EndIf
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+				circonflexe = False
+				trema = False
+
+			ElseIf KeyHit(KEY_D)
+				If Self.enmaj = False
+					Self.texteamod = Self.texteamod + "d"
+				Else
+					Self.texteamod = Self.texteamod + "D"
+				EndIf
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+				circonflexe = False
+				trema = False
+
+			ElseIf KeyHit(KEY_E)
+				If circonflexe = True
+					If Self.enmaj = False
+						Self.texteamod = Self.texteamod + "ê"
+					Else
+						Self.texteamod = Self.texteamod + "Ê"
+					EndIf
+				ElseIf trema = True
+					If Self.enmaj = False
+						Self.texteamod = Self.texteamod + "ë"
+					Else
+						Self.texteamod = Self.texteamod + "Ë"
+					EndIf
+				Else
+					If Self.enmaj = False
+						Self.texteamod = Self.texteamod + "e"
+					Else
+						Self.texteamod = Self.texteamod + "E"
+					EndIf
+				EndIf
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+				circonflexe = False
+				trema = False
+
+			ElseIf KeyHit(KEY_F)
+				If Self.enmaj = False
+					Self.texteamod = Self.texteamod + "f"
+				Else
+					Self.texteamod = Self.texteamod + "F"
+				EndIf
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+				circonflexe = False
+				trema = False
+
+			ElseIf KeyHit(KEY_G)
+				If Self.enmaj = False
+					Self.texteamod = Self.texteamod + "g"
+				Else
+					Self.texteamod = Self.texteamod + "G"
+				EndIf
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+				circonflexe = False
+				trema = False
+
+			ElseIf KeyHit(KEY_H)
+				If Self.enmaj = False
+					Self.texteamod = Self.texteamod + "h"
+				Else
+					Self.texteamod = Self.texteamod + "H"
+				EndIf
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+				circonflexe = False
+				trema = False
+
+			ElseIf KeyHit(KEY_I)
+				If circonflexe = True
+					If Self.enmaj = False
+						Self.texteamod = Self.texteamod + "î"
+					Else
+						Self.texteamod = Self.texteamod + "Î"
+					EndIf
+				ElseIf trema = True
+					If Self.enmaj = False
+						Self.texteamod = Self.texteamod + "ï"
+					Else
+						Self.texteamod = Self.texteamod + "Ï"
+					EndIf
+				Else
+					If Self.enmaj = False
+						Self.texteamod = Self.texteamod + "i"
+					Else
+						Self.texteamod = Self.texteamod + "I"
+					EndIf
+				EndIf
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+				circonflexe = False
+				trema = False
+
+			ElseIf KeyHit(KEY_J)
+				If Self.enmaj = False
+					Self.texteamod = Self.texteamod + "j"
+				Else
+					Self.texteamod = Self.texteamod + "J"
+				EndIf
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+				circonflexe = False
+				trema = False
+
+			ElseIf KeyHit(KEY_K)
+				If Self.enmaj = False
+					Self.texteamod = Self.texteamod + "k"
+				Else
+					Self.texteamod = Self.texteamod + "K"
+				EndIf
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+				circonflexe = False
+				trema = False
+
+			ElseIf KeyHit(KEY_L)
+				If Self.enmaj = False
+					Self.texteamod = Self.texteamod + "l"
+				Else
+					Self.texteamod = Self.texteamod + "L"
+				EndIf
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+				circonflexe = False
+				trema = False
+
+			ElseIf KeyHit(KEY_SEMICOLON)
+				If Self.enmaj = False
+					Self.texteamod = Self.texteamod + "m"
+				Else
+					Self.texteamod = Self.texteamod + "M"
+				EndIf
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+				circonflexe = False
+				trema = False
+
+			ElseIf KeyHit(KEY_N)
+				If Self.enmaj = False
+					Self.texteamod = Self.texteamod + "n"
+				Else
+					Self.texteamod = Self.texteamod + "N"
+				EndIf
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+				circonflexe = False
+				trema = False
+
+			ElseIf KeyHit(KEY_O)
+				If circonflexe = True
+					If Self.enmaj = False
+						Self.texteamod = Self.texteamod + "ô"
+					Else
+						Self.texteamod = Self.texteamod + "Ô"
+					EndIf
+				ElseIf trema = True
+					If Self.enmaj = False
+						Self.texteamod = Self.texteamod + "ö"
+					Else
+						Self.texteamod = Self.texteamod + "Ö"
+					EndIf
+				Else
+					If Self.enmaj = False
+						Self.texteamod = Self.texteamod + "o"
+					Else
+						Self.texteamod = Self.texteamod + "O"
+					EndIf
+				EndIf
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+				circonflexe = False
+				trema = False
+
+			ElseIf KeyHit(KEY_P)
+				If Self.enmaj = False
+					Self.texteamod = Self.texteamod + "p"
+				Else
+					Self.texteamod = Self.texteamod + "P"
+				EndIf
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+				circonflexe = False
+				trema = False
+
+			ElseIf KeyHit(KEY_Q)
+				If circonflexe = True
+					If Self.enmaj = False
+						Self.texteamod = Self.texteamod + "â"
+					Else
+						Self.texteamod = Self.texteamod + "Â"
+					EndIf
+				ElseIf trema = True
+					If Self.enmaj = False
+						Self.texteamod = Self.texteamod + "ä"
+					Else
+						Self.texteamod = Self.texteamod + "Ä"
+					EndIf
+				Else
+					If Self.enmaj = False
+						Self.texteamod = Self.texteamod + "a"
+					Else
+						Self.texteamod = Self.texteamod + "A"
+					EndIf
+				EndIf
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+				circonflexe = False
+				trema = False
+
+			ElseIf KeyHit(KEY_R)
+				If Self.enmaj = False
+					Self.texteamod = Self.texteamod + "r"
+				Else
+					Self.texteamod = Self.texteamod + "R"
+				EndIf
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+				circonflexe = False
+				trema = False
+
+			ElseIf KeyHit(KEY_S)
+				If Self.enmaj = False
+					Self.texteamod = Self.texteamod + "s"
+				Else
+					Self.texteamod = Self.texteamod + "S"
+				EndIf
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+				circonflexe = False
+				trema = False
+
+			ElseIf KeyHit(KEY_T)
+				If Self.enmaj = False
+					Self.texteamod = Self.texteamod + "t"
+				Else
+					Self.texteamod = Self.texteamod + "T"
+				EndIf
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+				circonflexe = False
+				trema = False
+
+			ElseIf KeyHit(KEY_U)
+				If circonflexe = True
+					If Self.enmaj = False
+						Self.texteamod = Self.texteamod + "û"
+					Else
+						Self.texteamod = Self.texteamod + "Û"
+					EndIf
+				ElseIf trema = True
+					If Self.enmaj = False
+						Self.texteamod = Self.texteamod + "ü"
+					Else
+						Self.texteamod = Self.texteamod + "Ü"
+					EndIf
+				Else
+					If Self.enmaj = False
+						Self.texteamod = Self.texteamod + "u"
+					Else
+						Self.texteamod = Self.texteamod + "U"
+					EndIf
+				EndIf
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+				circonflexe = False
+				trema = False
+
+			ElseIf KeyHit(KEY_V)
+				If Self.enmaj = False
+					Self.texteamod = Self.texteamod + "v"
+				Else
+					Self.texteamod = Self.texteamod + "V"
+				EndIf
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+				circonflexe = False
+				trema = False
+
+			ElseIf KeyHit(KEY_W)
+				If Self.enmaj = False
+					Self.texteamod = Self.texteamod + "z"
+				Else
+					Self.texteamod = Self.texteamod + "Z"
+				EndIf
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+				circonflexe = False
+				trema = False
+
+			ElseIf KeyHit(KEY_X)
+				If Self.enmaj = False
+					Self.texteamod = Self.texteamod + "x"
+				Else
+					Self.texteamod = Self.texteamod + "X"
+				EndIf
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+				circonflexe = False
+				trema = False
+
+			ElseIf KeyHit(KEY_Y)
+				If Self.enmaj = False
+					Self.texteamod = Self.texteamod + "y"
+				Else
+					Self.texteamod = Self.texteamod + "Y"
+				EndIf
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+				circonflexe = False
+				trema = False
+
+			ElseIf KeyHit(KEY_Z)
+				If Self.enmaj = False
+					Self.texteamod = Self.texteamod + "w"
+				Else
+					Self.texteamod = Self.texteamod + "W"
+				EndIf
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+				circonflexe = False
+				trema = False
+
+			ElseIf KeyHit(KEY_SPACE)
+				Self.texteamod = Self.texteamod + " "
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+			ElseIf KeyHit(KEY_2) And enmaj = False
+				Self.texteamod = Self.texteamod + "é"
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+			ElseIf KeyHit(KEY_7) And enmaj = False
+				Self.texteamod = Self.texteamod + "è"
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+			ElseIf KeyHit(KEY_4) And enmaj = False
+				Self.texteamod = Self.texteamod + "'"
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+			ElseIf KeyHit(KEY_6) And enmaj = False
+				Self.texteamod = Self.texteamod + "-"
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+			ElseIf KeyHit(KEY_8) And enmaj = False
+				Self.texteamod = Self.texteamod + "_"
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+			ElseIf KeyHit(KEY_0) And enmaj = False
+				Self.texteamod = Self.texteamod + "à"
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+			ElseIf KeyHit(KEY_9) And enmaj = False
+				Self.texteamod = Self.texteamod + "ç"
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+			ElseIf KeyHit(KEY_M) And enmaj = False
+				Self.texteamod = Self.texteamod + ","
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+			ElseIf KeyHit(KEY_M) And enmaj = True
+				Self.texteamod = Self.texteamod + "?"
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+			ElseIf KeyHit(KEY_COMMA) And enmaj = True
+				Self.texteamod = Self.texteamod + "."
+				Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+
+			EndIf
+		EndIf
+		If KeyHit(KEY_ENTER) Or KeyHit(KEY_ESCAPE) Or MouseHit(0)
+			Self.modetapetexte = False
+			If Self.texteamod = "" Then Self.texteamod = defaut
+			Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+
+			
+		ElseIf KeyHit(KEY_BACKSPACE)
+			Self.texteamod = Self.texteamod[ .. Self.texteamod.Length - 1]
+			Self.largeur = Self.policemodif.TextWidth(Self.texteamod)
+		EndIf
+		Return 0
+	End
+End
+
+Class LigneAcocher
+	Field lignecheck:BoutonCheck
+	Field textecheck:String
+	Field active:Bool 'on a cliqué sur la ligne
+	Field y:Float
+End
+Class Ascenseur
+	Field x:Float
+	Field y:Float
+	Field largeur:Float
+	Field hauteur:Float
+	Field image:Image
+	Field locked:Bool
+	Method New(image:Image)
+		Self.image = New Image
+		Self.image = image
+	End
+	Method Grab:Bool()
+		Local okgrab:Bool = False
+		If VMouseX > Self.x - Self.largeur / 2 And VMouseX < Self.x - Self.largeur / 2 + Self.largeur
+			If VMouseY > Self.y - Self.hauteur / 2 And VMouseY < Self.y - Self.hauteur / 2 + Self.hauteur
+				okgrab = True
+			EndIf
+		EndIf
+		Return okgrab
+		
+	End
+End
+Class ZoneAscenseur
+	Field imageflechehaut:Image
+	Field imageflechebas:Image
+	Field imagecageascenseur:Image
+	Field imagecabineascenseur:Image
+	Field cabineascenseur:Ascenseur
+	Field positioncabine:Float
+	Field decalagechamp:Float
+	Field x:Float
+	Field y:Float
+	Field largeur:Float
+	Field hauteur:Float
+	Field largeurbande:Float
+	Field hauteurhaut:Float
+	Field hauteurbas:Float
+	Field hauteurmilieu:Float
+	Field hauteurlignes:Float 'la hauteur totale de toutes les lignes
+	Field decalagemax:Float
+	Field echellemilieu:Float
+	Field ligne:LigneAcocher[]
+	Field policeligne:AngelFont
+	Field uneligneestactive:Bool 'il y a bien une ligne active
+	Field onvientdechangerdeligne:Bool 'on vient de changer de ligne
+	Field numeroligneactive:Int 'la ligne activee
+	Field modesurvol:Bool
+	Field champmodifie:Bool ' on a tripatouillé les checks du champ
+	Method New(imagehaut:Image, imagebas:Image, imagemilieu:Image, imagecabine:Image, x:Float, y:Float, largeur:Float, hauteur:Float, largeurbande:Float, hauteurhaut:Float, hauteurmilieu:Float, hauteurbas:Float, policeligne:AngelFont)
+		imageflechehaut = New Image
+		imageflechebas = New Image
+
+		'imagecabineascenseur = New Image
+		imagecageascenseur = New Image
+		imageflechehaut = imagehaut
+		imageflechebas = imagebas
+		imagecageascenseur = imagemilieu
+		'imagecabineascenseur = imagecabine
+		Self.x = x
+		Self.y = y
+		Self.largeur = largeur
+		Self.hauteur = hauteur
+		Self.largeurbande = largeurbande
+		Self.hauteurbas = hauteurbas
+		Self.hauteurhaut = hauteurhaut
+		Self.hauteurmilieu = hauteurmilieu
+		Self.echellemilieu = (Self.hauteur - Self.hauteurhaut - Self.hauteurbas) / Self.hauteurmilieu
+		Self.policeligne = policeligne
+		cabineascenseur = New Ascenseur(imagecabine)
+		cabineascenseur.x = Self.x + Self.largeur - Self.largeurbande + 6 + 11
+		cabineascenseur.y = Self.y + Self.hauteurhaut + 12 + 11
+		cabineascenseur.largeur = 22
+		cabineascenseur.hauteur = 22
+		
+	End
+	Method AjouteLignes:Int(nombredelignes:Int, imagecheck1:Image, imagecheck2:Image, largeurcheck:Float, hauteurcheck:Float)
+		ligne = ligne.Resize(nombredelignes)
+		Local incrligne:Float
+		
+		For Local i:Int = 0 To nombredelignes-1
+			ligne[i] = New LigneAcocher
+			ligne[i].lignecheck = New BoutonCheck(imagecheck1, imagecheck2, 0, 0, largeurcheck, hauteurcheck)
+			ligne[i].lignecheck.checked = True
+			incrligne = incrligne + Self.policeligne.height + 4
+			Self.ligne[i].y = Self.y + incrligne + Self.decalagechamp
+			
+		Next
+		Self.hauteurlignes = (policeligne.height + 4) * Self.ligne.Length()
+		Self.decalagemax = Self.hauteur - Self.hauteurlignes
+		Return 0
+		
+	End
+	Method TestSurvole:Int()
+		Local survole:Bool = False
+		If VMouseX > 0 And VMouseY > 0 'quand on active MouseZ bizarrement VMouseX et VMouseY passent à zéro?!
+			If VMouseX > Self.x And VMouseX < Self.x + Self.largeur And VMouseY > Self.y And VMouseY < Self.y + Self.hauteur
+				survole = True
+				Self.modesurvol = True
+			Else
+				Self.modesurvol = False
+			EndIf
+		EndIf
+		Return survole
+	End
+	Method TestMouseZ:Int()
+		Local sourisz:Float = MouseZ()
+		If Self.ligne.Length > 0 And Self.modesurvol = True
+			If sourisz < 0
+				If decalagechamp > Self.decalagemax Then decalagechamp = decalagechamp - 18 Else decalagechamp = decalagemax
+				cabineascenseur.y = (Self.hauteur - Self.hauteurbas - Self.hauteurhaut - 35) * (decalagechamp / decalagemax) + (Self.y + Self.hauteurhaut + 12 + 11)
+				If cabineascenseur.y > Self.y + Self.hauteur - hauteurbas - 16 Then cabineascenseur.y = Self.y + Self.hauteur - hauteurbas - 16
+			ElseIf sourisz > 0
+				If decalagechamp < 0 Then decalagechamp = decalagechamp + 18 Else decalagechamp = 0
+				cabineascenseur.y = (Self.hauteur - Self.hauteurbas - Self.hauteurhaut - 35) * (decalagechamp / decalagemax) + (Self.y + Self.hauteurhaut + 12 + 11)
+				If cabineascenseur.y < Self.y + hauteurhaut + 10 + 11 Then cabineascenseur.y = Self.y + Self.hauteurhaut + 12 + 11
+			EndIf
+		EndIf
+		Return 0
+	End
+	Method TestPresse:Int()
+		Local okdownhaut:Bool
+		Local okdownbas:Bool
+		Local okaudessusdelascenseur:Bool
+		Local okendessousdelascenseur:Bool
+		Local modifcheck:Bool = False
+		If MouseDown(0)
+			If Self.ligne.Length > 0
+				If cabineascenseur.Grab = True Or Self.cabineascenseur.locked = True
+					Self.cabineascenseur.locked = True
+					cabineascenseur.y = VMouseY
+					Local toutenhaut:Bool
+					Local toutenbas:Bool
+					If VMouseY < Self.y + hauteurhaut + 10 + 11 Then cabineascenseur.y = Self.y + Self.hauteurhaut + 12 + 11 toutenhaut = True Else toutenhaut = False
+					If VMouseY > Self.y + Self.hauteur - hauteurbas - 16 Then cabineascenseur.y = Self.y + Self.hauteur - hauteurbas - 16 toutenbas = True Else toutenbas = False
+					Local rapportasc:Float = (Self.cabineascenseur.y - (Self.y + Self.hauteurhaut + 12 + 11)) / (Self.hauteur - Self.hauteurbas - Self.hauteurhaut - 35) 'le degré de descente
+					If toutenhaut = True Then rapportasc = 0
+					If toutenbas = True Then rapportasc = 1
+					decalagechamp = rapportasc * decalagemax
+					
+					
+				Else
+				
+					okdownhaut = HitBouton(Self.x + Self.largeur - Self.largeurbande, Self.y, Self.largeurbande, Self.hauteurhaut)
+					okdownbas = HitBouton(Self.x + Self.largeur - Self.largeurbande, Self.y + hauteur - Self.hauteurbas, Self.largeurbande, Self.hauteurbas)
+					okaudessusdelascenseur = HitBouton(Self.x + Self.largeur - Self.largeurbande, Self.y + Self.hauteurhaut + 1, Self.largeurbande, Self.cabineascenseur.y - (Self.y + Self.hauteurhaut + 1))
+					okendessousdelascenseur = HitBouton(Self.x + Self.largeur - Self.largeurbande, Self.cabineascenseur.y + 1, Self.largeurbande, Self.y + Self.hauteur-Self.hauteurbas - (Self.cabineascenseur.y+ 1))
+					
+				
+					If okaudessusdelascenseur = True
+						If decalagechamp < 0 Then decalagechamp = decalagechamp + Self.cabineascenseur.hauteur * 3 Else decalagechamp = 0
+						cabineascenseur.y = (Self.hauteur - Self.hauteurbas - Self.hauteurhaut - 35) * (decalagechamp / decalagemax) + (Self.y + Self.hauteurhaut + 12 + 11)
+						If cabineascenseur.y < Self.y + hauteurhaut + 10 + 11 Then cabineascenseur.y = Self.y + Self.hauteurhaut + 12 + 11
+						ResetInput
+					ElseIf okendessousdelascenseur = True
+						If decalagechamp > Self.decalagemax Then decalagechamp = decalagechamp - Self.cabineascenseur.hauteur * 3 Else decalagechamp = decalagemax
+						cabineascenseur.y = (Self.hauteur - Self.hauteurbas - Self.hauteurhaut - 35) * (decalagechamp / decalagemax) + (Self.y + Self.hauteurhaut + 12 + 11)
+						If cabineascenseur.y > Self.y + Self.hauteur - hauteurbas - 16 Then cabineascenseur.y = Self.y + Self.hauteur - hauteurbas - 16
+						ResetInput
+					ElseIf okdownhaut = True
+						If decalagechamp < 0
+							decalagechamp = decalagechamp + 18
+						Else decalagechamp = 0
+						EndIf
+						cabineascenseur.y = (Self.hauteur - Self.hauteurbas - Self.hauteurhaut - 35) * (decalagechamp / decalagemax) + (Self.y + Self.hauteurhaut + 12 + 11)
+						'le calcul ci-dessus est le résultat d'une équation du 1er degré/règle de 3 tirée du calcul de rapportasc
+						If cabineascenseur.y < Self.y + hauteurhaut + 10 + 11 Then cabineascenseur.y = Self.y + Self.hauteurhaut + 12 + 11
+					ElseIf okdownbas = True
+						If decalagechamp > Self.decalagemax
+					
+							decalagechamp = decalagechamp - 18
+						Else decalagechamp = decalagemax
+						EndIf
+						cabineascenseur.y = (Self.hauteur - Self.hauteurbas - Self.hauteurhaut - 35) * (decalagechamp / decalagemax) + (Self.y + Self.hauteurhaut + 12 + 11)
+						If cabineascenseur.y > Self.y + Self.hauteur - hauteurbas - 16 Then cabineascenseur.y = Self.y + Self.hauteur - hauteurbas - 16
+					EndIf
+				EndIf
+			EndIf
+			If MouseDown(0) = False Then Self.cabineascenseur.locked = False
+		Else
+			Self.cabineascenseur.locked = False
+		EndIf
+		For Local i:Int = 0 To Self.ligne.Length() -1
+			If Self.ligne[i].lignecheck.y > Self.y - 5 And Self.ligne[i].lignecheck.y < (Self.y + Self.hauteur) ' on ne teste que ce qui est peu ou prou visible dans le scissor
+				If MouseHit(0)
+					If VMouseX() > Self.x + 40 And VMouseX() < Self.x + Self.largeur - Self.largeurbande
+						If VMouseY() > Self.ligne[i].y And VMouseY() < Self.ligne[i].y + Self.policeligne.height + 4
+							If Self.ligne[i].active = False Then Self.ligne[i].active = True Self.onvientdechangerdeligne = True Self.uneligneestactive = True Self.numeroligneactive = i Else Self.ligne[i].active = False Self.onvientdechangerdeligne=False Self.uneligneestactive = False
+							For Local ii:Int = 0 To Self.ligne.Length() -1
+								If ii <> i
+									Self.ligne[ii].active = False
+								EndIf
+							Next
+						EndIf
+					EndIf
+				EndIf
+				If Self.ligne[i].lignecheck.TestPresse() = True Then modifcheck = True
+				
+			EndIf
+		Next
+		Return modifcheck
+	End
+		
+	Method Draw:Int()
+		SetColor 240, 240, 240
+		DrawRect(x, y, largeur, hauteur)
+		VirtualDisplay.Display.SetVScissor(x, y, largeur, hauteur)
+		Local incrligne:Float = 0
+		For Local i:Int = 0 To Self.ligne.Length() -1
+			ligne[i].lignecheck.x = Self.x + 10
+			ligne[i].lignecheck.y = Self.y + incrligne + decalagechamp
+			If Self.ligne[i].active = True
+				SetColor 225, 220, 255
+				DrawRect(x + 40, Self.ligne[i].y, Self.largeur - 40, Self.policeligne.height + 4)
+				
+			EndIf
+			SetColor 255, 255, 255
+			ligne[i].lignecheck.Draw
+			
+			SetColor 10, 10, 50
+			Self.policeligne.DrawText(StripAll(Self.ligne[i].textecheck), x + 40, Self.y + incrligne + decalagechamp)
+			ligne[i].y = Self.y + incrligne + Self.decalagechamp ' on met à jour le y de la ligne de texte
+
+			incrligne = incrligne + Self.policeligne.height + 4
+
+		Next
+		SetColor 255, 255, 255
+		DrawImage(imagecageascenseur, Self.x + Self.largeur - Self.largeurbande, Self.y + Self.hauteurhaut, 0, 1, echellemilieu, 0)'Self.x + Self.largeur - Self.largeurbande + 50, Self.y + Self.hauteurhaut, 0, 0, 1, 0)
+		DrawImage(imageflechehaut, Self.x + Self.largeur - Self.largeurbande, Self.y, 0)
+		DrawImage(imageflechebas, Self.x + Self.largeur - Self.largeurbande, Self.y + Self.hauteur - Self.hauteurbas, 0)
+		DrawImage(cabineascenseur.image, cabineascenseur.x, cabineascenseur.y, 0)
+		VirtualDisplay.Display.UnsetVScissor
+		Return 0
+		
+	End
+		
+End
+Class BoutonCheck
+	Field imageboutonchecked:Image
+	Field imageboutonunchecked:Image
+	Field checked:Bool
+	Field largeur:Float
+	Field hauteur:Float
+	Field x:Float
+	Field y:Float
+	Method New(image1:Image, image2:Image, x:Float, y:Float, largeurimage:Float, hauteurimage:Float)
+		Self.imageboutonunchecked = New Image
+		Self.imageboutonchecked = New Image
+		Self.imageboutonunchecked = image1
+		Self.imageboutonchecked = image2
+		Self.x = x
+		Self.y = y
+		Self.largeur = largeurimage
+		Self.hauteur = hauteurimage
+	End
+	Method Draw:Int()
+		SetColor 255, 255, 255
+		If Self.checked = False
+			DrawImage(Self.imageboutonunchecked, Self.x, Self.y, 0)
+		Else
+			DrawImage(Self.imageboutonchecked, Self.x, Self.y, 0)
+
+		EndIf
+		Return 0
+		
+	End
+	
+	Method TestPresse:Bool()
+		Local okdown:Bool = False
+		If MouseHit(0)
+			okdown = HitBouton(Self.x, Self.y, Self.largeur, Self.hauteur)
+		EndIf
+		If okdown = True
+			If Self.checked = True Then Self.checked = False Else Self.checked = True
+		EndIf
+		Return okdown
+	End
+End
+Class BoutonTexte
+	Field imagebouton:Image
+	Field textebouton:String
+	Field policebouton:AngelFont
+	Field largeur:Float
+	Field hauteur:Float
+	Field x:Float
+	Field y:Float
+	Field enfoncex:Float
+	Field enfoncey:Float
+	Field justreleased:Bool
+	Field pressed:Bool 'on vient de relâcher
+	Field sensenfonce:Bool
+
+	Method New(image:Image, texte:String, police:AngelFont, x:Float, y:Float, largeurimage:Float, hauteurimage:Float)
+		Self.imagebouton = New Image
+		Self.imagebouton = image
+		Self.textebouton = texte
+		Self.policebouton = police
+		Self.x = x
+		Self.y = y
+		Self.largeur = largeurimage
+		Self.hauteur = hauteurimage
+	End
+	Method Draw:Int()'(x:Float, y:Float)
+		SetColor 255, 255, 255
+		DrawImage(Self.imagebouton, Self.x + enfoncex, Self.y + enfoncey, 0)
+		SetColor 10, 10, 50
+		
+		Self.policebouton.DrawText(Self.textebouton, x + (Self.largeur - policebouton.TextWidth(Self.textebouton)) / 2 + enfoncex, y + (Self.hauteur - policebouton.TextHeight(Self.textebouton)) / 2 - 2 + enfoncey)
+		Return 0
+	End
+	
+	Method TestPresse:Bool()
+		Local okdown:Bool = False
+		If MouseHit(0)
+			okdown = HitBouton(Self.x, Self.y, Self.largeur, Self.hauteur)
+			If okdown = True
+				Self.sensenfonce = True
+				If enfoncex < 1.5 Then enfoncex = enfoncex + 0.5
+				If enfoncey < 1.5 Then enfoncey = enfoncey + 0.5
+				okdown = False
+			EndIf
+		Else
+			'okdown = False
+			If sensenfonce = True
+				If enfoncex < 1.5 Then enfoncex = enfoncex + 0.5 Else sensenfonce = False Self.justreleased = True
+				If enfoncey < 1.5 Then enfoncey = enfoncey + 0.5
+
+			Else
+				If enfoncex > 0
+					enfoncex = enfoncex - 0.5
+				Else
+					If justreleased = True Then okdown = True justreleased = False
+				EndIf
+				
+				If enfoncey > 0 Then enfoncey = enfoncey - 0.5
+			EndIf
+		EndIf
+		
+		Return okdown
+	End
+
+	
+End
+
+Class BoutonChoix Extends BoutonTexte
+	Field textesauchoix:String[]
+	Field numeroitemchoisi:Int
+	Field nombredechoixpossibles:Int 'peut être régulé par un autre bouton ex "si nb de tests =2 choix des tests = test 1 et test 2
+	Method New(image:Image, texte:String, police:AngelFont, x:Float, y:Float, largeurimage:Float, hauteurimage:Float, nombrechoix:Int)
+		Self.imagebouton = New Image
+		Self.imagebouton = image
+		Self.textebouton = texte
+		Self.policebouton = police
+		Self.x = x
+		Self.y = y
+		Self.largeur = largeurimage
+		Self.hauteur = hauteurimage
+		textesauchoix = textesauchoix.Resize(nombrechoix)
+		Self.nombredechoixpossibles = nombrechoix
+	End
+	Method Draw:Int()'(x:Float, y:Float)
+		SetColor 255, 255, 255
+		DrawImage(Self.imagebouton, Self.x + enfoncex, Self.y + enfoncey, 0)
+		SetColor 10, 10, 50
+		
+		Self.policebouton.DrawText(Self.textebouton, x + 38 + (Self.largeur - policebouton.TextWidth(Self.textebouton) - 38) / 2 + enfoncex, y + (Self.hauteur - policebouton.TextHeight(Self.textebouton)) / 2 - 1 + enfoncey)
+		Return 0
+	End
+	Method TestPresse:Bool()
+		Local okpressebouton:Bool = False
+		If MouseHit(0)
+			If HitBouton(Self.x, Self.y, Self.largeur, Self.hauteur) = True
+				Self.sensenfonce = True
+				If enfoncex < 1.5 Then enfoncex = enfoncex + 0.5
+				If enfoncey < 1.5 Then enfoncey = enfoncey + 0.5
+
+				Self.pressed = True
+				okpressebouton = False
+			EndIf
+		Else
+			If sensenfonce = True
+				If enfoncex < 1.5 Then enfoncex = enfoncex + 0.5 Else sensenfonce = False
+				If enfoncey < 1.5 Then enfoncey = enfoncey + 0.5
+
+			Else
+				If enfoncex > 0 Then enfoncex = enfoncex - 0.5
+				If enfoncey > 0 Then enfoncey = enfoncey - 0.5
+			EndIf
+
+			If Self.pressed = True
+				Self.pressed = False
+				numeroitemchoisi = numeroitemchoisi + 1
+				If numeroitemchoisi > nombredechoixpossibles - 1 Then numeroitemchoisi = 0
+				Self.textebouton = Self.textesauchoix[numeroitemchoisi]
+				okpressebouton = True
+			EndIf
+		EndIf
+		
+		Return okpressebouton
+	End
+End

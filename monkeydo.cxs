@@ -1,0 +1,1277 @@
+﻿#GLFW_USE_MINGW=True
+Strict
+Import cerberus.lang
+Import mojo
+Import brl.requesters
+Import brl.filestream
+Import minigui
+
+Class ListeItems
+	Field itemencours:Int
+	Field vientdetremodifiee:Bool ' on vient de changer une liste en cochant/décochant un item si oui==>on recharge tout en cas d'interruption>reprise du diaporama sinon on reste sur la liste en mémoire
+	Field listechargee:Bool 'on a chargé les items de la liste.
+End
+Class ListeImages Extends ListeItems
+	Field tabimages:Image[]
+End
+
+Class ListeMots Extends ListeItems
+	Field tabmots:String[]
+End
+
+Class MyApp Extends App
+	'lu dans les préférences
+	Field prefnompatient:String
+	Field prefpathtests:String
+	Field pathtestpatient:String[6] 'le chemin complet de chaque test utilisé pour un patient donné
+	Field okboucle:Bool[6]
+	Field okrandom:Bool[6]
+	Field oktransition:Bool[6]
+	Field okson1:Bool[6]
+	Field okson2:Bool[6]
+	Field oktexte:Bool[6]
+	Field okquadrants:Bool[6]
+	Field choixtempstransition:Int[6]
+	Field choixtexteaffiche:String[6]
+	Field choixplacetextediapo:Int[6]
+	Field choixquadranttype:Int[6]
+	Field okcroix:Bool[6]
+	Field choixnombretests:Int
+	Field choixchoixtests:Int[6]
+	Field prefpathlogfile:String
+	Field typeerreurpatient:String[15]
+	'fin de lu dans les préférences
+	
+	Field police32:AngelFont
+	Field police24:AngelFont
+	Field policetextediapo:AngelFont
+	Field policetexteliste:AngelFont
+	Field nompatient:TexteAModifier
+	Field boutonloadprofil:BoutonTexte
+	Field boutonsaveprofil:BoutonTexte
+	Field boutonloadtest:BoutonTexte
+	Field champitems:ZoneAscenseur[6] 'une pour chaque test
+	Field nombretests:Int
+	Field boutonnombretests:BoutonChoix
+	Field boutonchoixtests:BoutonChoix
+	Field imageboutonchecked:Image
+	Field imageboutonunchecked:Image
+	Field prefspath:String ' on lit ce chemin dans les prefs
+	Field pathimagesoutextes:String[6]
+	Field typetestimages:Bool[6] ' le test comporte des images = True ; le test comporte du texte = False
+	Field pathfichierpatient:String
+	Field previewimage:Image[6]
+	Field vientdechargerimage:Bool 'on vient juste de charger
+	Field sontransition:Sound
+	Field sonimage:Sound
+	Field boutonlancer:BoutonTexte
+	Field boutonpoursuivre:BoutonTexte
+	Field checktransition:BoutonCheck
+	Field tempstransition:BoutonChoix
+	Field checkboucle:BoutonCheck
+	Field checkrandom:BoutonCheck
+	Field checkson1:BoutonCheck
+	Field checkson2:BoutonCheck
+	Field checktexte:BoutonCheck
+	Field texteaffiche:TexteAModifier
+	Field placetextediapo:BoutonChoix
+	Field checkcroix:BoutonCheck
+	Field checkquadrants:BoutonCheck
+	Field quadranttype:BoutonChoix
+	Field modediaporama:Bool
+	Field modechargement:Bool
+	Field affichemodechargement:Bool 'on a commencé à afficher
+	Field listeimages:ListeImages[6] 'la liste des images correspondant au test sélectionné
+	Field listemots:ListeMots[6] 'la liste des mots correspondant au test sélectionné
+	Field timer:Int
+	Field declenchementtransition:Bool
+	Field affichetransition:Bool
+	Field declenchementimage:Bool
+	Field afficheimageoutexte:Bool
+	Field tempsaffichageimage:Int[6]
+	Field tempspausestored:Int 'quand on est en pause on stocke le temps restant ici
+	Field donnees:String ' la chaîne correspondant aux erreurs du patient accumulées au fil du temps
+	Field tailledernieredonnee:Int ' la taille de la chaîne de caractères qui vient d'être ajoutée
+	Field modepause:Bool ' on est en pause?
+	Method ResetAll:Int() ' quand on appuie sur ESC ou à la fin d'une liste on revient au menu et à zéro
+		ResetInput
+		SetDeviceWindow(800, 600, 2 | 4)
+		Self.modediaporama = False
+		Self.modechargement = False
+		Self.affichemodechargement = False
+		Self.modepause = False
+		If donnees <> "" Then EnregistreDonnees()
+		Return 0
+	End
+	Method EnregistreDonnees:Int()
+		Print "on enregistre"
+		Local date:Int[] = GetDate()
+		Local pathmodif:String = prefpathlogfile.Replace("/", "\")
+		If Not pathmodif.EndsWith("\") Then pathmodif = pathmodif + "\"
+		Print pathmodif
+		Local nomdefic:String = pathmodif + "donnees_chir_" + date[2] + "-" + date[1] + "-" + date[0] + ".txt"
+		
+		Local file:= FileStream.Open(nomdefic, "a")
+		file.WriteString donnees, "utf8"
+		file.Close
+		donnees = ""
+		Return 0
+	End
+	
+	Method OteLigneErreur:Int()
+		If tailledernieredonnee <> 0
+			donnees = donnees[ .. donnees.Length - tailledernieredonnee]
+			tailledernieredonnee = 0
+		EndIf
+		Return 0
+	End
+	
+	Method AjouteLigneErreur:Int(typederreur:String)
+		Local date:Int[] = GetDate()
+		Local hour:String = ("0" + date[3])[ - 2 ..]
+		Local min:String = ("0" + date[4])[ - 2 ..]
+		Local sec:String = ("0" + date[5])[ - 2 ..]
+		Local itemaffiche:String
+		If typetestimages[Self.boutonchoixtests.numeroitemchoisi] = True
+			itemaffiche = StripAll(champitems[Self.boutonchoixtests.numeroitemchoisi].ligne[listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours].textecheck)
+		Else
+			itemaffiche = StripAll(champitems[Self.boutonchoixtests.numeroitemchoisi].ligne[listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours].textecheck)
+		EndIf
+		Local aajouter:String = hour + ":" + min + ":" + sec + " - " + itemaffiche + " - " + typederreur + String.FromChar(13) + String.FromChar(10)
+		donnees = donnees + aajouter
+		tailledernieredonnee = aajouter.Length
+		Return  0
+	End
+	
+	
+	
+	Method CopieListeMots:Int(ligne:LigneAcocher[], listemots:ListeMots)
+		listemots.tabmots = listemots.tabmots.Resize(ligne.Length())
+		Local nombreitems:Int
+		Local pathmodif:String = pathimagesoutextes[Self.boutonchoixtests.numeroitemchoisi].Replace("/", "\")
+		Local file:= FileStream.Open(pathmodif, "r")
+		Local i2:String[]
+		If file
+			While Not file.Eof()
+							
+				Local i:= file.ReadString("ascii")
+				i2 = i.Split(String.FromChar(13) + String.FromChar(10))
+			Wend
+			For Local i3:Int = 0 To i2.Length - 1
+				If champitems[Self.boutonchoixtests.numeroitemchoisi].ligne[i3].lignecheck.checked = True
+					listemots.tabmots[nombreitems] = i2[i3]
+					nombreitems = nombreitems + 1
+				EndIf
+			Next
+			
+		EndIf
+		listemots.tabmots = listemots.tabmots.Resize(nombreitems)
+		If Self.okrandom[Self.boutonchoixtests.numeroitemchoisi] = True Then ShuffleTab(listemots.tabmots)
+		For Local iii:Int = 0 To listemots.tabmots.Length - 1
+		Next
+		listemots.itemencours = 0
+
+		Return 0
+	End
+		
+	Method CopieListeImages:Int(ligne:LigneAcocher[], listeimages:ListeImages)
+		listeimages.tabimages = listeimages.tabimages.Resize(ligne.Length())
+		Local lechemin:String
+		Local nombreitems:Int
+		Local tabchemins:String[listeimages.tabimages.Length()]
+		For Local i:Int = 0 To listeimages.tabimages.Length() -1
+			If champitems[Self.boutonchoixtests.numeroitemchoisi].ligne[i].lignecheck.checked = True
+				lechemin = (pathimagesoutextes[Self.boutonchoixtests.numeroitemchoisi] + "\" + champitems[Self.boutonchoixtests.numeroitemchoisi].ligne[i].textecheck)
+				lechemin = lechemin.Replace("\", "/")
+				tabchemins[nombreitems] = lechemin
+				nombreitems = nombreitems + 1
+			EndIf
+		Next
+		
+		listeimages.tabimages = listeimages.tabimages.Resize(nombreitems)
+		tabchemins = tabchemins.Resize(nombreitems)
+		If Self.okrandom[Self.boutonchoixtests.numeroitemchoisi] = True Then ShuffleTab(tabchemins)
+		For Local i:Int = 0 To listeimages.tabimages.Length() -1
+			listeimages.tabimages[i] = LoadImage(tabchemins[i])
+		Next
+		listeimages.itemencours = 0
+		Return 0
+	End
+	Method ChargeParam:Int(pref:FileStream, chargeprefs:Bool)
+		If pref
+			Local stringstream:String = pref.ReadString()
+			Local lecturestring:String
+			If chargeprefs = True 'si on est en train de charger les prefs générales et pas des prefs particulières d'un patient
+				Local pathdestests:String = LoadState()
+				
+				If pathdestests = "" Then prefpathtests = stringstream.Split(String.FromChar(13) + String.FromChar(10))[3] Else prefpathtests = pathdestests
+			Else
+				Local path:String = stringstream.Split(String.FromChar(13) + String.FromChar(10))[3]
+				For Local iii:Int = 0 To 5
+					pathtestpatient[iii] = path.Split("|")[iii]
+				Next
+			EndIf
+			prefnompatient = stringstream.Split(String.FromChar(13) + String.FromChar(10))[1]
+			choixnombretests = Int(stringstream.Split(String.FromChar(13) + String.FromChar(10))[5])
+			lecturestring = stringstream.Split(String.FromChar(13) + String.FromChar(10))[8]
+			For Local ii:Int = 0 To 5
+				If lecturestring.Split("|")[ii] = "oui" Then oktransition[ii] = True Else oktransition[ii] = False
+			Next
+			lecturestring = stringstream.Split(String.FromChar(13) + String.FromChar(10))[10]
+			For Local ii:Int = 0 To 5
+				choixtempstransition[ii] = Int(lecturestring.Split("|")[ii])
+				Self.tempsaffichageimage[ii] = choixtempstransition[ii] * 1000
+
+			Next
+			lecturestring = stringstream.Split(String.FromChar(13) + String.FromChar(10))[12]
+			For Local ii:Int = 0 To 5
+				If lecturestring.Split("|")[ii] = "oui" Then okboucle[ii] = True Else okboucle[ii] = False
+			Next
+			lecturestring = stringstream.Split(String.FromChar(13) + String.FromChar(10))[14]
+			For Local ii:Int = 0 To 5
+				If lecturestring.Split("|")[ii] = "oui" Then okrandom[ii] = True Else okrandom[ii] = False
+			Next
+			lecturestring = stringstream.Split(String.FromChar(13) + String.FromChar(10))[16]
+			For Local ii:Int = 0 To 5
+				If lecturestring.Split("|")[ii] = "oui" Then okson1[ii] = True Else okson1[ii] = False
+			Next
+			lecturestring = stringstream.Split(String.FromChar(13) + String.FromChar(10))[18]
+			For Local ii:Int = 0 To 5
+				If lecturestring.Split("|")[ii] = "oui" Then okson2[ii] = True Else okson2[ii] = False
+			Next
+			lecturestring = stringstream.Split(String.FromChar(13) + String.FromChar(10))[20]
+			For Local ii:Int = 0 To 5
+				If lecturestring.Split("|")[ii] = "oui" Then oktexte[ii] = True Else oktexte[ii] = False
+			Next
+			lecturestring = stringstream.Split(String.FromChar(13) + String.FromChar(10))[22]
+			For Local ii:Int = 0 To 5
+				choixtexteaffiche[ii] = lecturestring.Split("|")[ii]
+			Next
+			lecturestring = stringstream.Split(String.FromChar(13) + String.FromChar(10))[24]
+			For Local ii:Int = 0 To 5
+				choixplacetextediapo[ii] = Int(lecturestring.Split("|")[ii])
+			Next
+			lecturestring = stringstream.Split(String.FromChar(13) + String.FromChar(10))[26]
+			For Local ii:Int = 0 To 5
+				If lecturestring.Split("|")[ii] = "oui" Then okquadrants[ii] = True Else okquadrants[ii] = False
+			Next
+			lecturestring = stringstream.Split(String.FromChar(13) + String.FromChar(10))[28]
+			For Local ii:Int = 0 To 5
+				choixquadranttype[ii] = Int(lecturestring.Split("|")[ii])
+			Next
+			lecturestring = stringstream.Split(String.FromChar(13) + String.FromChar(10))[30]
+			For Local ii:Int = 0 To 5
+				If lecturestring.Split("|")[ii] = "oui" Then okcroix[ii] = True Else okcroix[ii] = False
+			Next
+			If chargeprefs = True 'provisoire car non implémenté dans le fichier de chaque patient
+				prefpathlogfile = stringstream.Split(String.FromChar(13) + String.FromChar(10))[33]
+				typeerreurpatient[0] = stringstream.Split(String.FromChar(13) + String.FromChar(10))[36]
+				typeerreurpatient[1] = stringstream.Split(String.FromChar(13) + String.FromChar(10))[38]
+				typeerreurpatient[2] = stringstream.Split(String.FromChar(13) + String.FromChar(10))[40]
+				typeerreurpatient[3] = stringstream.Split(String.FromChar(13) + String.FromChar(10))[42]
+				typeerreurpatient[4] = stringstream.Split(String.FromChar(13) + String.FromChar(10))[44]
+				typeerreurpatient[5] = stringstream.Split(String.FromChar(13) + String.FromChar(10))[46]
+				typeerreurpatient[6] = stringstream.Split(String.FromChar(13) + String.FromChar(10))[48]
+				typeerreurpatient[7] = stringstream.Split(String.FromChar(13) + String.FromChar(10))[50]
+				typeerreurpatient[8] = stringstream.Split(String.FromChar(13) + String.FromChar(10))[52]
+				typeerreurpatient[9] = stringstream.Split(String.FromChar(13) + String.FromChar(10))[54]
+				typeerreurpatient[10] = stringstream.Split(String.FromChar(13) + String.FromChar(10))[56]
+				typeerreurpatient[11] = stringstream.Split(String.FromChar(13) + String.FromChar(10))[58]
+				typeerreurpatient[12] = stringstream.Split(String.FromChar(13) + String.FromChar(10))[60]
+				typeerreurpatient[13] = stringstream.Split(String.FromChar(13) + String.FromChar(10))[62]
+				typeerreurpatient[14] = stringstream.Split(String.FromChar(13) + String.FromChar(10))[64]
+			EndIf
+			Return True
+		Else
+			Return False
+		EndIf
+	End
+	
+	Method ConfigureBoutons:Int(numerotest:Int)
+		nompatient.texteamod=prefnompatient
+		boutonnombretests.numeroitemchoisi = choixnombretests - 1
+		boutonnombretests.textebouton = boutonnombretests.textesauchoix[boutonnombretests.numeroitemchoisi]
+		checktransition.checked = oktransition[numerotest]
+		tempstransition.numeroitemchoisi = choixtempstransition[numerotest] - 4
+		tempstransition.textebouton = tempstransition.textesauchoix[tempstransition.numeroitemchoisi]
+		checkboucle.checked = okboucle[numerotest]
+		checkrandom.checked = okrandom[numerotest]
+		checkson1.checked = okson1[numerotest]
+		checkson2.checked = okson2[numerotest]
+		checktexte.checked = oktexte[numerotest]
+		texteaffiche.texteamod = choixtexteaffiche[numerotest]
+		placetextediapo.numeroitemchoisi = choixplacetextediapo[numerotest]
+		placetextediapo.textebouton = placetextediapo.textesauchoix[placetextediapo.numeroitemchoisi]
+		checkcroix.checked = okcroix[numerotest]
+		checkquadrants.checked = okquadrants[numerotest]
+		quadranttype.numeroitemchoisi = choixquadranttype[numerotest]
+		quadranttype.textebouton = quadranttype.textesauchoix[quadranttype.numeroitemchoisi]
+
+		Return 0
+	End
+	Method ChargeListe:Int(numeroliste:Int, demarreauzero:Bool) 'on démarre au zéro quand on charge un profil complet en revanche si on charge juste une liste on reste dessus
+		Local decompte:Int
+		Local f:String
+		Local listedimages:Bool 'la liste contient des images plutôt que des textes
+		For f = EachIn LoadDir(pathimagesoutextes[numeroliste], False)
+			If f.EndsWith(".png") Or f.EndsWith(".bmp") Or f.EndsWith(".jpg") Or f.EndsWith(".jpeg")
+				listedimages = True
+			EndIf
+		Next
+		Self.champitems[numeroliste].champmodifie = True
+
+		
+		'recherche d'images
+		If listedimages = True
+			Self.champitems[numeroliste].AjouteLignes(LoadDir(pathimagesoutextes[numeroliste], False).Length(), imageboutonunchecked, imageboutonchecked, 21, 21)
+
+			For f = EachIn LoadDir(pathimagesoutextes[numeroliste], False)
+				If f.EndsWith(".png") Or f.EndsWith(".bmp") Or f.EndsWith(".jpg") Or f.EndsWith(".jpeg")
+					Self.champitems[numeroliste].ligne[decompte].textecheck = f
+					decompte = decompte + 1
+				EndIf
+			Next
+			typetestimages[numeroliste] = True
+		Else
+			'recherche de fichiers textes
+			Local pathmodif:String = pathimagesoutextes[numeroliste].Replace("/", "\")
+
+			If Not pathimagesoutextes[numeroliste].EndsWith(".txt")
+				If Not pathimagesoutextes[numeroliste].EndsWith("\") Then pathimagesoutextes[numeroliste] = pathimagesoutextes[numeroliste] + "\"
+				pathimagesoutextes[numeroliste] = RequestFile("Fichier texte à charger", "Text Files:txt", False, pathimagesoutextes[numeroliste])
+			EndIf
+			pathmodif = pathimagesoutextes[numeroliste].Replace("/", "\")
+			Local file:= FileStream.Open(pathmodif, "r")
+			If file
+				While Not file.Eof()
+							
+					Local i:= file.ReadString("ascii")
+					Local i2:String[] = i.Split(String.FromChar(13) + String.FromChar(10))
+					Self.champitems[numeroliste].AjouteLignes(i2.Length(), imageboutonunchecked, imageboutonchecked, 21, 21)
+
+					For Local i3:Int = 0 To i2.Length - 1
+						Self.champitems[numeroliste].ligne[i3].textecheck = i2[i3]
+						decompte = decompte + 1
+					Next
+				Wend
+				typetestimages[numeroliste] = False
+
+			EndIf
+		EndIf
+		Self.champitems[numeroliste].ligne = Self.champitems[numeroliste].ligne.Resize(decompte)
+		If decompte > 0
+			Local pathmodif:String = pathimagesoutextes[numeroliste].Replace("/", "\")
+			If pathmodif.EndsWith("\") Then pathmodif = pathmodif[ .. pathmodif.Length - 1] ' le chemin sauvegardé comporte des slash en sens / et un slash
+
+			Self.boutonchoixtests.textesauchoix[numeroliste] = (numeroliste + 1) + " " + StripAll(pathmodif)
+			If demarreauzero = False Or numeroliste = 0 Then Self.boutonchoixtests.textebouton = (numeroliste + 1) + " " + StripAll(pathmodif) 'pathimagesoutextes[numeroliste].Split("/")[pathimagesoutextes[numeroliste].Split("/").Length - 2]
+		Else
+			If numeroliste = 0
+				Self.boutonchoixtests.textesauchoix[numeroliste] = "test 1"
+				Self.boutonchoixtests.textebouton = "test 1"
+			ElseIf numeroliste = 1
+				Self.boutonchoixtests.textesauchoix[numeroliste] = "test 2"
+				Self.boutonchoixtests.textebouton = "test 2"
+			ElseIf numeroliste = 2
+				Self.boutonchoixtests.textesauchoix[numeroliste] = "test 3"
+				Self.boutonchoixtests.textebouton = "test 3"
+			ElseIf numeroliste = 3
+				Self.boutonchoixtests.textesauchoix[numeroliste] = "test 4"
+				Self.boutonchoixtests.textebouton = "test 4"
+			ElseIf numeroliste = 4
+				Self.boutonchoixtests.textesauchoix[numeroliste] = "test 5"
+				Self.boutonchoixtests.textebouton = "test 5"
+			ElseIf numeroliste = 5
+				Self.boutonchoixtests.textesauchoix[numeroliste] = "test 6"
+				Self.boutonchoixtests.textebouton = "test 6"
+			EndIf
+		EndIf
+		Self.champitems[numeroliste].uneligneestactive = False
+		Self.champitems[numeroliste].decalagechamp=0 'on remet le décalage à zéro
+		Self.champitems[numeroliste].cabineascenseur.y = Self.champitems[numeroliste].y + Self.champitems[numeroliste].hauteurhaut + 12 + 11
+		Return 0
+	End
+	Method OnCreate:Int()
+		SetUpdateRate 30
+		SetVirtualDisplay 1024, 768
+		Local pref:FileStream = FileStream.Open("cerberus://internal/config.txt", "r")
+		Self.ChargeParam(pref, True)
+		Local date:= GetDate()
+		Seed = date[3] * 3600000 + date[4] * 60000 + date[5] * 1000 + date[6]
+		pref.Close
+
+		If prefnompatient = "" Then prefnompatient = "<nom>"
+		If prefpathtests = "" Then prefpathtests = "C:/"
+		Local imageboutontexte:Image = LoadImage("single.png", 1, Image.XYPadding)
+		imageboutonchecked = LoadImage("check2.png", 1, Image.XYPadding)
+		imageboutonunchecked = LoadImage("check1.png", 1, Image.XYPadding)
+		Local imageboutonflechehaut:Image = LoadImage("imageflechehaut.png", 1, Image.XYPadding)
+		Local imageboutonflechebas:Image = LoadImage("imageflechebas.png", 1, Image.XYPadding)
+		Local imagecabineascenseur:Image = LoadImage("imagecabineascenseur.png", 1, Image.XYPadding)
+		imagecabineascenseur.SetHandle(11,11)
+		Local imagecageascenseur:Image = LoadImage("imagecageascenseur.png", 1, Image.XYPadding)
+		Local imagechoix:Image = LoadImage("multi2.png", 1, Image.XYPadding)
+		Local imagechoix2:Image = LoadImage("multi3.png", 1, Image.XYPadding)
+
+		police32 = New AngelFont
+		police24 = New AngelFont
+		policetextediapo = New AngelFont
+		policetexteliste = New AngelFont
+		police32.LoadFontXml("arial32")
+		police24.LoadFontXml("arial24")
+		policetextediapo.LoadFontXml("timesnewroman48")
+		policetexteliste.LoadFontXml("timesnewroman72")
+		sontransition = LoadSound("ding.wav")
+		sonimage = LoadSound("dingdong.wav")
+		nompatient = New TexteAModifier(120, 10, police32, prefnompatient)
+		boutonloadprofil = New BoutonTexte(imageboutontexte, "charger", police24, 1024 - 364 - 10, 10, 182, 41)
+		boutonsaveprofil = New BoutonTexte(imageboutontexte, "enregistrer", police24, 1024 - 182 - 5, 10, 182, 41)
+		boutonloadtest = New BoutonTexte(imageboutontexte, "charger", police24, 1024 - 182 - 5, 56, 182, 41)
+
+		boutonnombretests = New BoutonChoix(imagechoix2, choixnombretests, police24, 240, 56, 128, 38, 6)
+		boutonnombretests.numeroitemchoisi = choixnombretests - 1
+		boutonnombretests.textesauchoix[0] = "1"
+		boutonnombretests.textesauchoix[1] = "2"
+		boutonnombretests.textesauchoix[2] = "3"
+		boutonnombretests.textesauchoix[3] = "4"
+		boutonnombretests.textesauchoix[4] = "5"
+		boutonnombretests.textesauchoix[5] = "6"
+		boutonchoixtests = New BoutonChoix(imagechoix, "test 1", police24, 1024 - 182 - 256 - 7, 56, 256, 38, 6)
+		boutonchoixtests.textesauchoix[0] = "test 1"
+		boutonchoixtests.textesauchoix[1] = "test 2"
+		boutonchoixtests.textesauchoix[2] = "test 3"
+		boutonchoixtests.textesauchoix[3] = "test 4"
+		boutonchoixtests.textesauchoix[4] = "test 5"
+		boutonchoixtests.textesauchoix[5] = "test 6"
+		boutonchoixtests.nombredechoixpossibles = Self.boutonnombretests.numeroitemchoisi + 1
+		
+		For Local j:Int = 0 To 5
+			champitems[j] = New ZoneAscenseur(imageboutonflechehaut, imageboutonflechebas, imagecageascenseur, imagecabineascenseur, 10, 120, 500, 350, 34, 19, 254, 23, police24)
+		Next
+		checktransition = New BoutonCheck(imageboutonunchecked, imageboutonchecked, 20, 494, 21, 21)
+		checktransition.checked = True
+		tempstransition = New BoutonChoix(imagechoix2, "4s", police24, 272, 486, 128, 39, 5)
+		tempstransition.numeroitemchoisi = 0
+		tempstransition.textesauchoix[0] = "4s"
+		tempstransition.textesauchoix[1] = "5s"
+		tempstransition.textesauchoix[2] = "6s"
+		tempstransition.textesauchoix[3] = "7s"
+		tempstransition.textesauchoix[4] = "8s"
+		
+		checkboucle = New BoutonCheck(imageboutonunchecked, imageboutonchecked, 500, 494, 21, 21)
+		checkboucle.checked = True
+		checkrandom = New BoutonCheck(imageboutonunchecked, imageboutonchecked, 827, 494, 21, 21)
+		checkrandom.checked = False
+		checkson1 = New BoutonCheck(imageboutonunchecked, imageboutonchecked, 20, 540, 21, 21)
+		checkson2 = New BoutonCheck(imageboutonunchecked, imageboutonchecked, 500, 540, 21, 21)
+		checkson1.checked = True
+		checkson2.checked = False
+		checktexte = New BoutonCheck(imageboutonunchecked, imageboutonchecked, 20, 586, 21, 21)
+		checktexte.checked = True
+		texteaffiche = New TexteAModifier(140, 580, police32, "CECI EST")
+		placetextediapo = New BoutonChoix(imagechoix, "texte au-dessus", police24, 498, 578, 256, 39, 2)
+		placetextediapo.textesauchoix[0] = "texte au-dessus"
+		placetextediapo.textesauchoix[1] = "texte en-dessous"
+		checkquadrants = New BoutonCheck(imageboutonunchecked, imageboutonchecked, 20, 632, 21, 21)
+		quadranttype = New BoutonChoix(imagechoix, "quadrant supérieur G", police24, 206, 624, 256, 39, 2)
+		quadranttype.textesauchoix[0] = "quadrant supérieur G"
+		quadranttype.textesauchoix[1] = "quadrant inférieur G"
+		checkcroix = New BoutonCheck(imageboutonunchecked, imageboutonchecked, 500, 632, 21, 21)
+
+		boutonpoursuivre = New BoutonTexte(imageboutontexte, "poursuivre", police32, (1024 - 364 - 10) / 2, 768 - 48 - 10, 182, 41)
+		boutonlancer = New BoutonTexte(imageboutontexte, "lancer", police32, boutonpoursuivre.x + boutonpoursuivre.largeur + 5, 768 - 48 - 10, 182, 41)
+		For Local i:Int = 0 To 5
+			listeimages[i] = New ListeImages
+			listemots[i] = New ListeMots
+		Next
+		Self.ConfigureBoutons(0)
+		Return 0
+	End Method
+	
+	Method OnUpdate:Int()
+		If modediaporama = False ' si on est dans l'interface
+			
+			If Self.boutonloadprofil.TestPresse() = True
+				Local bakpathfichier:String = pathfichierpatient
+				pathfichierpatient = RequestFile("Fichier à charger", "Text Files:txt", False)
+				If pathfichierpatient <> ""
+					Local prefer:FileStream = FileStream.Open(pathfichierpatient, "r")
+
+					Self.ChargeParam(prefer, False)
+				
+					For Local iii:Int = 0 To 5
+						If pathtestpatient[iii] <> "/"
+							pathimagesoutextes[iii] = Self.pathtestpatient[iii]
+							Self.ChargeListe(iii, True)
+						EndIf
+					Next
+					If prefer Then prefer.Close
+					prefer = FileStream.Open(pathfichierpatient, "r")
+					If prefer
+						Local stringstream:String = prefer.ReadString()
+				
+						Local lignelue:String = stringstream.Split(String.FromChar(13) + String.FromChar(10))[32]
+						If lignelue.Contains("|")
+							For Local ii:Int = 0 To lignelue.Split("|").Length - 1
+								Local numligneadecocher:Int = Int(lignelue.Split("|")[ii])
+								champitems[0].ligne[numligneadecocher].lignecheck.checked = False
+							Next
+						EndIf
+						lignelue = stringstream.Split(String.FromChar(13) + String.FromChar(10))[34]
+						If lignelue.Contains("|")
+							For Local ii:Int = 0 To lignelue.Split("|").Length - 1
+								Local numligneadecocher:Int = Int(lignelue.Split("|")[ii])
+								champitems[1].ligne[numligneadecocher].lignecheck.checked = False
+							Next
+						EndIf
+						lignelue = stringstream.Split(String.FromChar(13) + String.FromChar(10))[36]
+						If lignelue.Contains("|")
+							For Local ii:Int = 0 To lignelue.Split("|").Length - 1
+								Local numligneadecocher:Int = Int(lignelue.Split("|")[ii])
+								champitems[2].ligne[numligneadecocher].lignecheck.checked = False
+							Next
+						EndIf
+						lignelue = stringstream.Split(String.FromChar(13) + String.FromChar(10))[38]
+						If lignelue.Contains("|")
+							For Local ii:Int = 0 To lignelue.Split("|").Length - 1
+								Local numligneadecocher:Int = Int(lignelue.Split("|")[ii])
+								champitems[3].ligne[numligneadecocher].lignecheck.checked = False
+							Next
+						EndIf
+						lignelue = stringstream.Split(String.FromChar(13) + String.FromChar(10))[40]
+						If lignelue.Contains("|")
+							For Local ii:Int = 0 To lignelue.Split("|").Length - 1
+								Local numligneadecocher:Int = Int(lignelue.Split("|")[ii])
+								champitems[4].ligne[numligneadecocher].lignecheck.checked = False
+							Next
+						EndIf
+						lignelue = stringstream.Split(String.FromChar(13) + String.FromChar(10))[42]
+						If lignelue.Contains("|")
+							For Local ii:Int = 0 To lignelue.Split("|").Length - 1
+								Local numligneadecocher:Int = Int(lignelue.Split("|")[ii])
+								champitems[5].ligne[numligneadecocher].lignecheck.checked = False
+							Next
+						EndIf
+						
+						prefpathlogfile = stringstream.Split(String.FromChar(13) + String.FromChar(10))[44]
+						Print prefpathlogfile+ "= bon ou pas?"
+						typeerreurpatient[0] = stringstream.Split(String.FromChar(13) + String.FromChar(10))[47]
+						typeerreurpatient[1] = stringstream.Split(String.FromChar(13) + String.FromChar(10))[49]
+						typeerreurpatient[2] = stringstream.Split(String.FromChar(13) + String.FromChar(10))[51]
+						typeerreurpatient[3] = stringstream.Split(String.FromChar(13) + String.FromChar(10))[53]
+						typeerreurpatient[4] = stringstream.Split(String.FromChar(13) + String.FromChar(10))[55]
+						typeerreurpatient[5] = stringstream.Split(String.FromChar(13) + String.FromChar(10))[57]
+						typeerreurpatient[6] = stringstream.Split(String.FromChar(13) + String.FromChar(10))[59]
+						typeerreurpatient[7] = stringstream.Split(String.FromChar(13) + String.FromChar(10))[61]
+						typeerreurpatient[8] = stringstream.Split(String.FromChar(13) + String.FromChar(10))[63]
+						typeerreurpatient[9] = stringstream.Split(String.FromChar(13) + String.FromChar(10))[65]
+						typeerreurpatient[10] = stringstream.Split(String.FromChar(13) + String.FromChar(10))[67]
+						typeerreurpatient[11] = stringstream.Split(String.FromChar(13) + String.FromChar(10))[69]
+						typeerreurpatient[12] = stringstream.Split(String.FromChar(13) + String.FromChar(10))[71]
+						typeerreurpatient[13] = stringstream.Split(String.FromChar(13) + String.FromChar(10))[73]
+						typeerreurpatient[14] = stringstream.Split(String.FromChar(13) + String.FromChar(10))[75]
+						Self.boutonchoixtests.numeroitemchoisi = 0
+						Self.ConfigureBoutons(0)
+
+						boutonchoixtests.nombredechoixpossibles = Self.boutonnombretests.numeroitemchoisi + 1
+
+						prefer.Close
+					EndIf
+				Else
+					pathfichierpatient = bakpathfichier
+				EndIf
+				
+			EndIf
+			If Self.boutonsaveprofil.TestPresse() = True
+				pathfichierpatient = RequestFile("Fichier à enregistrer", "Text Files:txt", True)
+				Local fichiertextepatient:FileStream = FileStream.Open(pathfichierpatient, "w")
+				If fichiertextepatient
+					fichiertextepatient.WriteString("Nom du patient :" + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString(nompatient.texteamod + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString("Chemin des tests :" + String.FromChar(13) + String.FromChar(10), "utf8")
+					Local letexte:String[6]
+					
+					For Local iiii:Int = 0 To 5
+						If Not pathimagesoutextes[iiii].EndsWith("/") And Not pathimagesoutextes[iiii].EndsWith(".txt") Then letexte[iiii] = pathimagesoutextes[iiii] + "/" Else letexte[iiii] = pathimagesoutextes[iiii]
+						letexte[iiii] = letexte[iiii].Replace("\", "/")
+					Next
+					fichiertextepatient.WriteString(letexte[0] + "|" + letexte[1] + "|" + letexte[2] + "|" + letexte[3] + "|" + letexte[4] + "|" + letexte[5] + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString("Nombre de tests :" + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString( (boutonnombretests.numeroitemchoisi + 1) + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString("***Configuration des tests 0, 1, 2, 3, 4, 5 [<=> test 1, test 2, test 3, test 4, test 5, test 6]***" + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString("Transition:" + String.FromChar(13) + String.FromChar(10), "utf8")
+					For Local iiii:Int = 0 To 5
+						If oktransition[iiii] = True Then letexte[iiii] = "oui" Else letexte[iiii] = "non"
+					Next
+					fichiertextepatient.WriteString(letexte[0] + "|" + letexte[1] + "|" + letexte[2] + "|" + letexte[3] + "|" + letexte[4] + "|" + letexte[5] + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString("Temps transition (s) :" + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString(Self.choixtempstransition[0] + "|" + Self.choixtempstransition[1] + "|" + Self.choixtempstransition[2] + "|" + Self.choixtempstransition[3]+ "|" + Self.choixtempstransition[4] + "|" + Self.choixtempstransition[5] + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString("En boucle :" + String.FromChar(13) + String.FromChar(10), "utf8")
+					For Local iiii:Int = 0 To 5
+						If okboucle[iiii] = True Then letexte[iiii] = "oui" Else letexte[iiii] = "non"
+					Next
+					fichiertextepatient.WriteString(letexte[0] + "|" + letexte[1] + "|" + letexte[2] + "|" + letexte[3] + "|" + letexte[4] + "|" + letexte[5] + String.FromChar(13) + String.FromChar(10), "utf8")
+
+					fichiertextepatient.WriteString("Lecture aléatoire :" + String.FromChar(13) + String.FromChar(10), "utf8")
+
+					For Local iiii:Int = 0 To 5
+						If okrandom[iiii] = True Then letexte[iiii] = "oui" Else letexte[iiii] = "non"
+					Next
+					fichiertextepatient.WriteString(letexte[0] + "|" + letexte[1] + "|" + letexte[2] + "|" + letexte[3] + "|" + letexte[4] + "|" + letexte[5] + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString("Son à chaque transition :" + String.FromChar(13) + String.FromChar(10), "utf8")
+					For Local iiii:Int = 0 To 5
+						If okson1[iiii] = True Then letexte[iiii] = "oui" Else letexte[iiii] = "non"
+					Next
+					fichiertextepatient.WriteString(letexte[0] + "|" + letexte[1] + "|" + letexte[2] + "|" + letexte[3] + "|" + letexte[4] + "|" + letexte[5] + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString("Son à chaque image :" + String.FromChar(13) + String.FromChar(10), "utf8")
+					For Local iiii:Int = 0 To 5
+						If okson2[iiii] = True Then letexte[iiii] = "oui" Else letexte[iiii] = "non"
+					Next
+					fichiertextepatient.WriteString(letexte[0] + "|" + letexte[1] + "|" + letexte[2] + "|" + letexte[3] + "|" + letexte[4] + "|" + letexte[5] + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString("Texte présent :" + String.FromChar(13) + String.FromChar(10), "utf8")
+					For Local iiii:Int = 0 To 5
+						If oktexte[iiii] = True Then letexte[iiii] = "oui" Else letexte[iiii] = "non"
+					Next
+					fichiertextepatient.WriteString(letexte[0] + "|" + letexte[1] + "|" + letexte[2] + "|" + letexte[3] + "|" + letexte[4] + "|" + letexte[5] + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString("Texte à afficher :" + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString(Self.choixtexteaffiche[0] + "|" + Self.choixtexteaffiche[1] + "|" + Self.choixtexteaffiche[2] + "|" + Self.choixtexteaffiche[3]+ "|" + Self.choixtexteaffiche[4] + "|" + Self.choixtexteaffiche[5] + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString("Texte au-dessus(0) ou en-dessous(1) :" + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString(Self.choixplacetextediapo[0] + "|" + Self.choixplacetextediapo[1] + "|" + Self.choixplacetextediapo[2] + "|" + Self.choixplacetextediapo[3] + "|" + Self.choixplacetextediapo[4] + "|" + Self.choixplacetextediapo[5] + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString("Affichage par quadrants :" + String.FromChar(13) + String.FromChar(10), "utf8")
+					For Local iiii:Int = 0 To 5
+						If okquadrants[iiii] = True Then letexte[iiii] = "oui" Else letexte[iiii] = "non"
+					Next
+					fichiertextepatient.WriteString(letexte[0] + "|" + letexte[1] + "|" + letexte[2] + "|" + letexte[3]+ "|" + letexte[4] + "|" + letexte[5] + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString("Quadrant supérieur (0) ou inférieur (1) :" + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString(Self.choixquadranttype[0] + "|" + Self.choixquadranttype[1] + "|" + Self.choixquadranttype[2] + "|" + Self.choixquadranttype[3] + "|" + Self.choixquadranttype[4] + "|" + Self.choixquadranttype[5] + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString("Croix :" + String.FromChar(13) + String.FromChar(10), "utf8")
+					For Local iiii:Int = 0 To 5
+						If okcroix[iiii] = True Then letexte[iiii] = "oui" Else letexte[iiii] = "non"
+					Next
+					fichiertextepatient.WriteString(letexte[0] + "|" + letexte[1] + "|" + letexte[2] + "|" + letexte[3] + "|" + letexte[4] + "|" + letexte[5] + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString("Items décochés pour la liste 1 :" + String.FromChar(13) + String.FromChar(10), "utf8")
+					Local lignefaux:String = ""
+					If Self.champitems[0].ligne.Length > 0
+						For Local ii:Int = 0 To Self.champitems[0].ligne.Length - 1
+							If Self.champitems[0].ligne[ii].lignecheck.checked = False Then lignefaux = lignefaux + ii + "|"
+						Next
+						lignefaux = lignefaux[ .. lignefaux.Length - 1]
+						fichiertextepatient.WriteString(lignefaux + String.FromChar(13) + String.FromChar(10), "utf8")
+					Else fichiertextepatient.WriteString(String.FromChar(13) + String.FromChar(10), "utf8")
+					EndIf
+					fichiertextepatient.WriteString("Items décochés pour la liste 2 :" + String.FromChar(13) + String.FromChar(10), "utf8")
+					lignefaux = ""
+					If Self.champitems[1].ligne.Length > 0
+						For Local ii:Int = 0 To Self.champitems[1].ligne.Length - 1
+							If Self.champitems[1].ligne[ii].lignecheck.checked = False Then lignefaux = lignefaux + ii + "|"
+						Next
+						lignefaux = lignefaux[ .. lignefaux.Length - 1]
+						fichiertextepatient.WriteString(lignefaux + String.FromChar(13) + String.FromChar(10), "utf8")
+					Else fichiertextepatient.WriteString(String.FromChar(13) + String.FromChar(10), "utf8")
+					EndIf
+					fichiertextepatient.WriteString("Items décochés pour la liste 3 :" + String.FromChar(13) + String.FromChar(10), "utf8")
+					lignefaux = ""
+					If Self.champitems[2].ligne.Length > 0
+						For Local ii:Int = 0 To Self.champitems[2].ligne.Length - 1
+							If Self.champitems[2].ligne[ii].lignecheck.checked = False Then lignefaux = lignefaux + ii + "|"
+						Next
+						lignefaux = lignefaux[ .. lignefaux.Length - 1]
+						fichiertextepatient.WriteString(lignefaux + String.FromChar(13) + String.FromChar(10), "utf8")
+					Else fichiertextepatient.WriteString(String.FromChar(13) + String.FromChar(10), "utf8")
+					EndIf
+					fichiertextepatient.WriteString("Items décochés pour la liste 4 :" + String.FromChar(13) + String.FromChar(10), "utf8")
+					lignefaux = ""
+					If Self.champitems[3].ligne.Length > 0
+						For Local ii:Int = 0 To Self.champitems[3].ligne.Length - 1
+							If Self.champitems[3].ligne[ii].lignecheck.checked = False Then lignefaux = lignefaux + ii + "|"
+						Next
+						lignefaux = lignefaux[ .. lignefaux.Length - 1]
+						fichiertextepatient.WriteString(lignefaux + String.FromChar(13) + String.FromChar(10), "utf8")
+					Else fichiertextepatient.WriteString(String.FromChar(13) + String.FromChar(10), "utf8")
+					EndIf
+					fichiertextepatient.WriteString("Items décochés pour la liste 5 :" + String.FromChar(13) + String.FromChar(10), "utf8")
+					lignefaux = ""
+					If Self.champitems[4].ligne.Length > 0
+						For Local ii:Int = 0 To Self.champitems[4].ligne.Length - 1
+							If Self.champitems[4].ligne[ii].lignecheck.checked = False Then lignefaux = lignefaux + ii + "|"
+						Next
+						lignefaux = lignefaux[ .. lignefaux.Length - 1]
+						fichiertextepatient.WriteString(lignefaux + String.FromChar(13) + String.FromChar(10), "utf8")
+					Else fichiertextepatient.WriteString(String.FromChar(13) + String.FromChar(10), "utf8")
+					EndIf
+					fichiertextepatient.WriteString("Items décochés pour la liste 6 :" + String.FromChar(13) + String.FromChar(10), "utf8")
+					lignefaux = ""
+					If Self.champitems[5].ligne.Length > 0
+						For Local ii:Int = 0 To Self.champitems[5].ligne.Length - 1
+							If Self.champitems[5].ligne[ii].lignecheck.checked = False Then lignefaux = lignefaux + ii + "|"
+						Next
+						lignefaux = lignefaux[ .. lignefaux.Length - 1]
+						fichiertextepatient.WriteString(lignefaux + String.FromChar(13) + String.FromChar(10), "utf8")
+					Else fichiertextepatient.WriteString(String.FromChar(13) + String.FromChar(10), "utf8")
+					EndIf
+					fichiertextepatient.WriteString("Chemin du fichier journal : " + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString(prefpathlogfile + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString("Codage des erreurs : " + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString("Pavé numérique 0 : " + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString(typeerreurpatient[0] + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString("Pavé numérique 1 : " + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString(typeerreurpatient[1] + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString("Pavé numérique 2 : " + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString(typeerreurpatient[2] + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString("Pavé numérique 3 : " + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString(typeerreurpatient[3] + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString("Pavé numérique 4 : " + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString(typeerreurpatient[4] + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString("Pavé numérique 5 : " + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString(typeerreurpatient[5] + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString("Pavé numérique 6 : " + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString(typeerreurpatient[6] + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString("Pavé numérique 7 : " + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString(typeerreurpatient[7] + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString("Pavé numérique 8 : " + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString(typeerreurpatient[8] + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString("Pavé numérique 9 : " + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString(typeerreurpatient[9] + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString("Pavé numérique . : " + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString(typeerreurpatient[10] + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString("Pavé numérique + : " + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString(typeerreurpatient[11] + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString("Pavé numérique - : " + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString(typeerreurpatient[12] + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString("Pavé numérique * : " + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString(typeerreurpatient[13] + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString("Pavé numérique / : " + String.FromChar(13) + String.FromChar(10), "utf8")
+					fichiertextepatient.WriteString(typeerreurpatient[14] + String.FromChar(13) + String.FromChar(10), "utf8")
+
+					fichiertextepatient.Close
+				EndIf
+			EndIf
+			
+			If Self.champitems[Self.boutonchoixtests.numeroitemchoisi].TestPresse() = True 'on a tripatouillé les checks
+				Self.champitems[Self.boutonchoixtests.numeroitemchoisi].champmodifie = True
+			EndIf
+		
+			If Self.nompatient.TestPresse() = True
+				
+			EndIf
+			If Self.boutonchoixtests.TestPresse() = True
+				Self.ConfigureBoutons(Self.boutonchoixtests.numeroitemchoisi)
+			EndIf
+			If Self.boutonnombretests.TestPresse() = True
+				choixnombretests = Self.boutonnombretests.numeroitemchoisi + 1
+				Self.boutonchoixtests.nombredechoixpossibles = Self.boutonnombretests.numeroitemchoisi + 1
+
+			EndIf
+			If Self.texteaffiche.TestPresse() = True
+			EndIf
+			If Self.placetextediapo.TestPresse() = True
+				If Self.placetextediapo.numeroitemchoisi = 0 Then choixplacetextediapo[Self.boutonchoixtests.numeroitemchoisi] = 0 Else choixplacetextediapo[Self.boutonchoixtests.numeroitemchoisi] = 1
+				
+			EndIf
+			If Self.checkcroix.TestPresse() = True
+				If Self.checkcroix.checked = True Then okcroix[Self.boutonchoixtests.numeroitemchoisi] = True Else okcroix[Self.boutonchoixtests.numeroitemchoisi] = False
+			EndIf
+			If Self.checkquadrants.TestPresse() = True
+				If Self.checkquadrants.checked = True Then okquadrants[Self.boutonchoixtests.numeroitemchoisi] = True Else okquadrants[Self.boutonchoixtests.numeroitemchoisi] = False
+
+			EndIf
+			If Self.quadranttype.TestPresse() = True
+				If Self.quadranttype.numeroitemchoisi = 0 Then choixquadranttype[Self.boutonchoixtests.numeroitemchoisi] = 0 Else choixquadranttype[Self.boutonchoixtests.numeroitemchoisi] = 1
+
+			EndIf
+			
+			Local testpoursuivre:Bool
+			If Self.boutonpoursuivre.TestPresse() = True
+				testpoursuivre = True
+			EndIf
+			Self.champitems[Self.boutonchoixtests.numeroitemchoisi].TestSurvole()
+
+			Self.champitems[Self.boutonchoixtests.numeroitemchoisi].TestMouseZ()
+			If KeyHit(KEY_F5)
+				If KeyDown(KEY_SHIFT)
+					testpoursuivre = True
+				EndIf
+			EndIf
+			If Self.modechargement = True And affichemodechargement = True
+				If typetestimages[Self.boutonchoixtests.numeroitemchoisi] = True
+					Self.CopieListeImages(champitems[Self.boutonchoixtests.numeroitemchoisi].ligne, listeimages[Self.boutonchoixtests.numeroitemchoisi])
+				Else
+					Self.CopieListeMots(champitems[Self.boutonchoixtests.numeroitemchoisi].ligne, listemots[Self.boutonchoixtests.numeroitemchoisi])
+
+				EndIf
+				Self.affichemodechargement = False
+				Self.modechargement = False
+				Self.modediaporama = True
+				Self.declenchementtransition = True
+				Self.affichetransition = True
+				Self.declenchementimage = False
+				Self.afficheimageoutexte = False
+				Self.champitems[Self.boutonchoixtests.numeroitemchoisi].champmodifie = False
+				If testpoursuivre = False Then Self.listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours = 0 Self.listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours = 0
+			
+			EndIf
+
+			If Self.boutonlancer.TestPresse() = True Or testpoursuivre = True Or KeyHit(KEY_F5)
+				If Self.champitems[Self.boutonchoixtests.numeroitemchoisi].ligne.Length() > 0 ' si on a chargé des items dans le champ
+					ResetInput
+					If Self.champitems[Self.boutonchoixtests.numeroitemchoisi].champmodifie = True
+						Self.modechargement = True
+					Else
+						Self.modediaporama = True
+						Self.declenchementtransition = True
+						Self.affichetransition = True
+						Self.declenchementimage = False
+						Self.afficheimageoutexte = False
+						Self.champitems[Self.boutonchoixtests.numeroitemchoisi].champmodifie = False
+						If testpoursuivre = False Then Self.listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours = 0 Self.listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours = 0
+					EndIf
+					SetDeviceWindow(1024, 768, 1)
+					HideMouse
+
+				EndIf
+			EndIf
+
+			If Self.boutonloadtest.TestPresse() = True
+				ResetInput
+				Local bakpathimages:String = pathimagesoutextes[Self.boutonchoixtests.numeroitemchoisi]
+				pathimagesoutextes[Self.boutonchoixtests.numeroitemchoisi] = RequestDir("Répertoire des items", prefpathtests)
+				If pathimagesoutextes[Self.boutonchoixtests.numeroitemchoisi] <> ""
+					Self.ChargeListe(Self.boutonchoixtests.numeroitemchoisi, False)
+
+					Local pathamodif:String = ExtractDir(pathimagesoutextes[Self.boutonchoixtests.numeroitemchoisi]) ' on utilise SaveState/LoadState pour enregistrer le dossier des tests
+					pathamodif = pathamodif.Replace("\", "/") + "/"
+					prefpathtests = pathamodif
+					SaveState(prefpathtests)
+				Else
+					pathimagesoutextes[Self.boutonchoixtests.numeroitemchoisi] = bakpathimages
+				EndIf
+			EndIf
+		
+		
+			If Self.nompatient.modetapetexte = True
+				Self.nompatient.TapeTexte(500, "<nom>")
+				prefnompatient = Self.nompatient.texteamod
+			EndIf
+			If Self.texteaffiche.modetapetexte = True
+				Self.texteaffiche.TapeTexte(500, "CECI EST")
+				choixtexteaffiche[Self.boutonchoixtests.numeroitemchoisi] = Self.texteaffiche.texteamod
+
+			EndIf
+			'chargement de la preview de l'image sélectionnée dans le champ
+			If Self.champitems[Self.boutonchoixtests.numeroitemchoisi].uneligneestactive = True And Self.vientdechargerimage = False And typetestimages[Self.boutonchoixtests.numeroitemchoisi] = True
+
+				Local lechemin:String = (pathimagesoutextes[Self.boutonchoixtests.numeroitemchoisi] + "\" + champitems[Self.boutonchoixtests.numeroitemchoisi].ligne[champitems[Self.boutonchoixtests.numeroitemchoisi].numeroligneactive].textecheck)
+				lechemin = lechemin.Replace("\", "/")
+				previewimage[Self.boutonchoixtests.numeroitemchoisi] = LoadImage(lechemin)'
+				Self.vientdechargerimage = True
+			ElseIf(Self.champitems[Self.boutonchoixtests.numeroitemchoisi].uneligneestactive = False And Self.vientdechargerimage = True) Or Self.champitems[Self.boutonchoixtests.numeroitemchoisi].onvientdechangerdeligne = True
+			
+				Self.vientdechargerimage = False
+				Self.champitems[Self.boutonchoixtests.numeroitemchoisi].onvientdechangerdeligne = False
+			EndIf
+		
+			If Self.checktransition.TestPresse() = True
+				If Self.checktransition.checked = True Then Self.oktransition[Self.boutonchoixtests.numeroitemchoisi] = True Else Self.oktransition[Self.boutonchoixtests.numeroitemchoisi] = False
+
+			EndIf
+			If Self.tempstransition.TestPresse() = True
+				Self.tempsaffichageimage[Self.boutonchoixtests.numeroitemchoisi] = (Int(Self.tempstransition.numeroitemchoisi) + 4) * 1000
+				Self.choixtempstransition[Self.boutonchoixtests.numeroitemchoisi] = Self.tempstransition.numeroitemchoisi + 4
+			EndIf
+			If Self.checkboucle.TestPresse() = True
+				If Self.checkboucle.checked = True Then Self.okboucle[Self.boutonchoixtests.numeroitemchoisi] = True Else Self.okboucle[Self.boutonchoixtests.numeroitemchoisi] = False
+			EndIf
+			If Self.checkrandom.TestPresse() = True
+				If Self.checkrandom.checked = True Then Self.okrandom[Self.boutonchoixtests.numeroitemchoisi] = True Else Self.okrandom[Self.boutonchoixtests.numeroitemchoisi] = False
+				Self.champitems[Self.boutonchoixtests.numeroitemchoisi].champmodifie = True
+			EndIf
+			If Self.checkson1.TestPresse() = True
+				If Self.checkson1.checked = True Then Self.okson1[Self.boutonchoixtests.numeroitemchoisi] = True Else Self.okson1[Self.boutonchoixtests.numeroitemchoisi] = False
+
+			EndIf
+			If Self.checkson2.TestPresse() = True
+				If Self.checkson2.checked = True Then Self.okson2[Self.boutonchoixtests.numeroitemchoisi] = True Else Self.okson2[Self.boutonchoixtests.numeroitemchoisi] = False
+
+			EndIf
+			If Self.checktexte.TestPresse() = True
+				If Self.checktexte.checked = True Then Self.oktexte[Self.boutonchoixtests.numeroitemchoisi] = True Else Self.oktexte[Self.boutonchoixtests.numeroitemchoisi] = False
+
+			EndIf
+			
+		Else ' MODE DIAPORAMA
+		
+			If KeyHit(KEY_ESCAPE)
+				If Self.checkquadrants.checked = False ' si affichage d'une seule image
+					If typetestimages[Self.boutonchoixtests.numeroitemchoisi] = True ' si on affiche des images
+						If Self.listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours < listeimages[Self.boutonchoixtests.numeroitemchoisi].tabimages.Length() -1
+							Self.listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours = Self.listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours + 1
+						Else ' on passe un peu en avance à l'item suivant pour ne pas le réafficher 50 fois
+							Self.listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours = 0
+						EndIf
+					Else 'si on affiche du texte
+						If Self.listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours < listemots[Self.boutonchoixtests.numeroitemchoisi].tabmots.Length() -1
+							Self.listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours = Self.listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours + 1
+						Else ' on passe un peu en avance à l'item suivant pour ne pas le réafficher 50 fois
+							Self.listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours = 0
+						EndIf
+
+					EndIf
+				Else 'si affichage en quadrants
+					If typetestimages[Self.boutonchoixtests.numeroitemchoisi] = True ' si on affiche des images
+
+						If Self.listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours < listeimages[Self.boutonchoixtests.numeroitemchoisi].tabimages.Length() -2
+							Self.listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours = Self.listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours + 2
+						Else ' on passe un peu en avance à l'item suivant pour ne pas le réafficher 50 fois
+							Self.listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours = 0
+						EndIf
+					Else 'on affiche des mots
+						If Self.listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours < listemots[Self.boutonchoixtests.numeroitemchoisi].tabmots.Length() -2
+							Self.listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours = Self.listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours + 2
+						Else ' on passe un peu en avance à l'item suivant pour ne pas le réafficher 50 fois
+							Self.listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours = 0
+						EndIf
+
+					EndIf
+
+				EndIf
+				
+				Self.ResetAll
+				ShowMouse
+			EndIf
+			If KeyHit(KEY_Q)
+				ResetInput()
+				If Self.modepause = False
+					Self.modepause = True
+					tempspausestored = Millisecs() -timer
+				Else
+					Self.modepause = False
+					timer = Millisecs() -tempspausestored
+					
+					
+				EndIf
+				
+			EndIf
+			
+			If KeyHit(KEY_NUM0) = True
+				AjouteLigneErreur(typeerreurpatient[0])
+			ElseIf KeyHit(KEY_NUM1) = True
+				AjouteLigneErreur(typeerreurpatient[1])
+			ElseIf KeyHit(KEY_NUM2) = True
+				AjouteLigneErreur(typeerreurpatient[2])
+			ElseIf KeyHit(KEY_NUM3) = True
+				AjouteLigneErreur(typeerreurpatient[3])
+			ElseIf KeyHit(KEY_NUM4) = True
+				AjouteLigneErreur(typeerreurpatient[4])
+			ElseIf KeyHit(KEY_NUM5) = True
+				AjouteLigneErreur(typeerreurpatient[5])
+			ElseIf KeyHit(KEY_NUM6) = True
+				AjouteLigneErreur(typeerreurpatient[6])
+			ElseIf KeyHit(KEY_NUM7) = True
+				AjouteLigneErreur(typeerreurpatient[7])
+			ElseIf KeyHit(KEY_NUM8) = True
+				AjouteLigneErreur(typeerreurpatient[8])
+			ElseIf KeyHit(KEY_NUM9) = True
+				AjouteLigneErreur(typeerreurpatient[9])
+
+			ElseIf KeyHit(KEY_NUMDECIMAL) = True
+				AjouteLigneErreur(typeerreurpatient[10])
+			ElseIf KeyHit(KEY_NUMADD) = True
+				AjouteLigneErreur(typeerreurpatient[11])
+			ElseIf KeyHit(KEY_NUMSUBTRACT) = True
+				AjouteLigneErreur(typeerreurpatient[12])
+			ElseIf KeyHit(KEY_NUMMULTIPLY) = True
+				AjouteLigneErreur(typeerreurpatient[13])
+			ElseIf KeyHit(KEY_NUMDIVIDE) = True
+				AjouteLigneErreur(typeerreurpatient[14])
+			ElseIf KeyHit(KEY_BACKSPACE) = True
+				If donnees.Length > 0
+					OteLigneErreur()
+				EndIf
+			EndIf
+			
+			If KeyHit(KEY_ENTER)
+				ResetInput()
+				Self.modepause = False
+				timer = Millisecs() -tempspausestored
+			EndIf
+			If Self.modepause = True
+				timer = Millisecs()
+			EndIf
+			If Self.declenchementtransition = True
+				timer = Millisecs()
+				declenchementtransition = False
+				affichetransition = True
+				If checkson1.checked = True Then PlaySound(sontransition)
+			EndIf
+			If affichetransition = True
+				If Millisecs() >= timer + 1000
+					declenchementimage = True
+					affichetransition = False
+				EndIf
+			EndIf
+				
+			If Self.declenchementimage = True
+				timer = Millisecs()
+				declenchementimage = False
+				afficheimageoutexte = True
+				If checkson2.checked = True Then PlaySound(sonimage)
+			EndIf
+			If afficheimageoutexte = True
+				If (checktransition.checked = True And Millisecs() > timer + Self.tempsaffichageimage[Self.boutonchoixtests.numeroitemchoisi]) Or KeyHit(KEY_RIGHT) Or (KeyHit(KEY_LEFT) And listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours > 0) Or (KeyHit(KEY_LEFT) And listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours > 0)
+					If KeyHit(KEY_LEFT) And listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours > 0 Then listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours = listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours - 2
+					If KeyHit(KEY_LEFT) And listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours > 0 Then listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours = listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours - 2
+
+					ResetInput
+					timer = Millisecs()
+					afficheimageoutexte = False
+					affichetransition = True
+					declenchementtransition = True
+					If Self.checkquadrants.checked = False
+						If typetestimages[Self.boutonchoixtests.numeroitemchoisi] = True 'si on affiche des images
+							listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours = listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours + 1
+						Else 'si on affiche du texte
+							listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours = listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours + 1
+						EndIf
+						
+					Else
+						If typetestimages[Self.boutonchoixtests.numeroitemchoisi] = True 'si on affiche des images
+							listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours = listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours + 2
+						Else
+							listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours = listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours + 2
+
+						EndIf
+					EndIf
+					
+					If typetestimages[Self.boutonchoixtests.numeroitemchoisi] = True 'si on affiche des images
+						If listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours > Self.listeimages[Self.boutonchoixtests.numeroitemchoisi].tabimages.Length - 1
+							listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours = 0
+							If Self.checkboucle.checked = False Then Self.ResetAll()
+						EndIf
+					Else 'si on affiche du texte
+						If listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours > Self.listemots[Self.boutonchoixtests.numeroitemchoisi].tabmots.Length - 1
+							listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours = 0
+							If Self.checkboucle.checked = False Then Self.ResetAll()
+						EndIf
+					EndIf
+				EndIf
+			EndIf
+		EndIf
+		
+		Return 0
+	End
+	
+	Method OnRender:Int()
+		
+		UpdateVirtualDisplay
+		Cls 255, 255, 255
+		If modediaporama = False And modechargement = False
+			SetColor 100, 100, 150
+			police32.DrawText("Patient : ", 10, 10)
+			police32.DrawText("Nombre de tests : ", 10, 60)
+			police32.DrawText("Test : ", 490, 60)
+			police32.DrawText("Transition après : ", 51, 488)
+			police32.DrawText("Diaporama en boucle", 531, 488)
+			police32.DrawText("Aléatoire", 858, 488)
+			police32.DrawText("Son à chaque transition", 51, 534)
+			police32.DrawText("Son à chaque image", 531, 534)
+			police32.DrawText("Texte :", 51, 580)
+			police32.DrawText("Quadrants", 51, 626)
+			police32.DrawText("Croix", 531, 626)
+
+			SetColor 255, 255, 255
+			Self.boutonloadprofil.Draw
+			Self.boutonsaveprofil.Draw
+			Self.boutonloadtest.Draw
+			Self.champitems[Self.boutonchoixtests.numeroitemchoisi].Draw
+			Self.nompatient.Draw
+			Self.boutonchoixtests.Draw
+			Self.boutonnombretests.Draw
+			Self.boutonlancer.Draw
+			Self.boutonpoursuivre.Draw
+			Self.checktransition.Draw
+			Self.tempstransition.Draw
+			Self.checkboucle.Draw
+			Self.checkrandom.Draw
+			Self.checkson1.Draw
+			Self.checkson2.Draw
+			Self.checktexte.Draw
+			Self.texteaffiche.Draw
+			Self.placetextediapo.Draw
+			Self.checkcroix.Draw
+			Self.checkquadrants.Draw
+			Self.quadranttype.Draw
+			If Self.champitems[Self.boutonchoixtests.numeroitemchoisi].uneligneestactive = True And typetestimages[Self.boutonchoixtests.numeroitemchoisi] = True
+				SetColor 255, 255, 255
+				Local scalex:Float
+				Local scaley:Float
+				Local scalefinal:Float
+				Local large:Float = previewimage[boutonchoixtests.numeroitemchoisi].Width()
+				Local haute:Float = previewimage[boutonchoixtests.numeroitemchoisi].Height()
+				Local largeresized:Float
+				Local hautresized:Float
+				Local decalx:Float
+				Local decaly:Float
+				'on compare au rectangle gris (dimensions 500 x 350px) de visualisation à droite
+			
+				scalex = 500 / large
+				scaley = 350 / haute
+				If previewimage[boutonchoixtests.numeroitemchoisi].Width() > previewimage[boutonchoixtests.numeroitemchoisi].Height() Then scalefinal = scalex Else scalefinal = scaley
+				largeresized = scalefinal * large
+				hautresized = scalefinal * haute
+				decalx = (500 - largeresized) / 2
+				decaly = (350 - hautresized) / 2
+				DrawImage(previewimage[boutonchoixtests.numeroitemchoisi], 514 + decalx, 120 + decaly, 0, scalefinal, scalefinal, 0)
+			Else
+				SetColor 240, 240, 240
+				DrawRect(514, 120, 500, 350)
+				SetColor 255,255,255
+
+			EndIf
+		
+		ElseIf modediaporama = True
+			Cls 255, 255, 255
+			If Self.afficheimageoutexte = True
+				Local decalparrapportatexte:Float
+				Local decalx:Float
+				Local decaly:Float
+				Local scalex:Float
+				Local scaley:Float
+				Local scalefinal:Float
+				Local largeresized:Float
+				Local hautresized:Float
+				Local scalex2:Float
+				Local scaley2:Float
+				Local scalefinal2:Float
+				Local largeresized2:Float
+				Local hautresized2:Float
+				Local itemnumerodeux:Int 'le numéro du 2ème item
+
+				If Self.checkquadrants.checked = False 'calculs d'emplacements et de taille
+					If typetestimages[Self.boutonchoixtests.numeroitemchoisi] = True 'si on affiche une image pas un texte
+						Local large:Float = listeimages[Self.boutonchoixtests.numeroitemchoisi].tabimages[listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours].Width()
+						Local haute:Float = listeimages[Self.boutonchoixtests.numeroitemchoisi].tabimages[listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours].Height()
+			
+						scalex = 768 / large
+						scaley = 576 / haute
+						If listeimages[Self.boutonchoixtests.numeroitemchoisi].tabimages[listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours].Width() > listeimages[Self.boutonchoixtests.numeroitemchoisi].tabimages[listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours].Height() Then scalefinal = scalex Else scalefinal = scaley
+						largeresized = scalefinal * large
+						hautresized = scalefinal * haute
+						decalx = (1024 - largeresized) / 2
+						decaly = (768 - hautresized) / 2
+					
+					EndIf
+					
+				Else
+					If typetestimages[Self.boutonchoixtests.numeroitemchoisi] = True 'calcul valable seulement si on affiche des images
+						If listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours + 1 <= listeimages[Self.boutonchoixtests.numeroitemchoisi].tabimages.Length() -1
+							itemnumerodeux = listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours + 1
+						Else
+							itemnumerodeux = 0
+						EndIf
+					
+						Local largeb:Float = listeimages[Self.boutonchoixtests.numeroitemchoisi].tabimages[listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours].Width()
+						Local hauteb:Float = listeimages[Self.boutonchoixtests.numeroitemchoisi].tabimages[listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours].Height()
+						Local largeb2:Float = listeimages[Self.boutonchoixtests.numeroitemchoisi].tabimages[itemnumerodeux].Width()
+						Local hauteb2:Float = listeimages[Self.boutonchoixtests.numeroitemchoisi].tabimages[itemnumerodeux].Height()
+			
+						scalex = 512 / largeb
+						scaley = 384 / hauteb
+						scalex2 = 512 / largeb2
+						scaley2 = 384 / hauteb2
+						If listeimages[Self.boutonchoixtests.numeroitemchoisi].tabimages[listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours].Width() > listeimages[Self.boutonchoixtests.numeroitemchoisi].tabimages[listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours].Height() Then scalefinal = scalex Else scalefinal = scaley
+						If listeimages[Self.boutonchoixtests.numeroitemchoisi].tabimages[listeimages[Self.boutonchoixtests.numeroitemchoisi + 1].itemencours].Width() > listeimages[Self.boutonchoixtests.numeroitemchoisi].tabimages[itemnumerodeux].Height() Then scalefinal2 = scalex2 Else scalefinal = scaley2
+
+						largeresized = scalefinal * largeb
+						hautresized = scalefinal * hauteb
+						largeresized2 = scalefinal2 * largeb2
+						hautresized2 = scalefinal2 * hauteb2
+					Else
+						If listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours + 1 <= listemots[Self.boutonchoixtests.numeroitemchoisi].tabmots.Length() -1
+							itemnumerodeux = listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours + 1
+						Else
+							itemnumerodeux = 0
+						EndIf
+
+					EndIf
+				EndIf
+				If Self.checkquadrants.checked = False
+					If Self.placetextediapo.numeroitemchoisi = 0 And Self.checktexte.checked = True 'si c'est en haut
+						decalparrapportatexte = 60
+						SetColor 50, 40, 40
+						policetextediapo.DrawText(texteaffiche.texteamod, (1024 - policetextediapo.TextWidth(texteaffiche.texteamod)) / 2, 106)
+					ElseIf Self.placetextediapo.numeroitemchoisi = 1 And Self.checktexte.checked = True 'si c'est en haut
+						decalparrapportatexte = -60
+						SetColor 50, 40, 40
+						policetextediapo.DrawText(texteaffiche.texteamod, (1024 - policetextediapo.TextWidth(texteaffiche.texteamod)) / 2, 768 - 106 - policetextediapo.height)
+
+					EndIf
+				EndIf
+				SetColor 255, 255, 255
+				If Self.checkquadrants.checked = False
+					If typetestimages[Self.boutonchoixtests.numeroitemchoisi] = True ' si on affiche une image
+						DrawImage(listeimages[Self.boutonchoixtests.numeroitemchoisi].tabimages[listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours], decalx, decaly + decalparrapportatexte, 0, scalefinal, scalefinal, 0)
+					Else
+					
+						SetColor 50, 40, 40
+						policetexteliste.DrawText(listemots[Self.boutonchoixtests.numeroitemchoisi].tabmots[listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours], (1024 - policetextediapo.TextWidth(listemots[Self.boutonchoixtests.numeroitemchoisi].tabmots[listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours])) / 2 - 25, (768 - policetextediapo.TextHeight(listemots[Self.boutonchoixtests.numeroitemchoisi].tabmots[listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours])) / 2 - 20)
+					EndIf
+				Else
+					If Self.quadranttype.numeroitemchoisi = 0
+						If typetestimages[Self.boutonchoixtests.numeroitemchoisi] = True ' si on affiche une image
+							DrawImage(listeimages[Self.boutonchoixtests.numeroitemchoisi].tabimages[listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours], 0, 0, 0, scalefinal, scalefinal, 0)
+							DrawImage(listeimages[Self.boutonchoixtests.numeroitemchoisi].tabimages[itemnumerodeux], 512, 384, 0, scalefinal2, scalefinal2, 0)
+						Else
+							SetColor 50, 40, 40
+							policetexteliste.DrawText(listemots[Self.boutonchoixtests.numeroitemchoisi].tabmots[listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours], (512 - policetextediapo.TextWidth(listemots[Self.boutonchoixtests.numeroitemchoisi].tabmots[listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours])) / 2 - 25, (384 - policetextediapo.TextHeight(listemots[Self.boutonchoixtests.numeroitemchoisi].tabmots[listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours])) / 2 - 20)
+							policetexteliste.DrawText(listemots[Self.boutonchoixtests.numeroitemchoisi].tabmots[itemnumerodeux], (512 - policetextediapo.TextWidth(listemots[Self.boutonchoixtests.numeroitemchoisi].tabmots[listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours])) / 2 - 25 + 512, (384 - policetextediapo.TextHeight(listemots[Self.boutonchoixtests.numeroitemchoisi].tabmots[listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours])) / 2 - 20 + 384)
+
+						EndIf
+					Else
+						If typetestimages[Self.boutonchoixtests.numeroitemchoisi] = True ' si on affiche une image
+							DrawImage(listeimages[Self.boutonchoixtests.numeroitemchoisi].tabimages[listeimages[Self.boutonchoixtests.numeroitemchoisi].itemencours], 0, 384, 0, scalefinal, scalefinal, 0)
+							DrawImage(listeimages[Self.boutonchoixtests.numeroitemchoisi].tabimages[itemnumerodeux], 512, 0, 0, scalefinal2, scalefinal2, 0)
+						Else
+							SetColor 50, 40, 40
+							policetexteliste.DrawText(listemots[Self.boutonchoixtests.numeroitemchoisi].tabmots[listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours], (512 - policetextediapo.TextWidth(listemots[Self.boutonchoixtests.numeroitemchoisi].tabmots[listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours])) / 2 - 25, (384 - policetextediapo.TextHeight(listemots[Self.boutonchoixtests.numeroitemchoisi].tabmots[listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours])) / 2 - 20 + 384)
+							policetexteliste.DrawText(listemots[Self.boutonchoixtests.numeroitemchoisi].tabmots[itemnumerodeux], (512 - policetextediapo.TextWidth(listemots[Self.boutonchoixtests.numeroitemchoisi].tabmots[listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours])) / 2 - 25+512, (384 - policetextediapo.TextHeight(listemots[Self.boutonchoixtests.numeroitemchoisi].tabmots[listemots[Self.boutonchoixtests.numeroitemchoisi].itemencours])) / 2 - 20)
+
+						EndIf
+					EndIf
+				EndIf
+			EndIf
+			If Self.checkcroix.checked = True
+				SetColor 255, 0, 0
+				DrawRect(512 - 4, 384 - 16, 8, 32)
+				DrawRect(512 - 16, 384 - 4, 32, 8)
+				SetColor 255, 255, 255
+				
+			EndIf
+			If Self.modepause = True
+				SetColor 50, 40, 40
+				police32.DrawText("||", (1024 - police32.TextWidth("||")) / 2, 768 - 10 - police32.height*2-4)
+
+				police32.DrawText("<ENTREE> pour poursuivre", (1024 - police32.TextWidth("<ENTREE> pour poursuivre")) / 2, 768 - 10 - police32.height)
+
+			EndIf
+		ElseIf modechargement = True
+			Cls(255, 255, 255)
+			affichemodechargement = True
+			If typetestimages[Self.boutonchoixtests.numeroitemchoisi] = True
+				SetColor 50, 40, 50
+				police32.DrawText("Chargement des images...", (1024 - police32.TextWidth("Chargement des images...")) / 2, (768 - police32.height) / 2)
+			EndIf
+		EndIf
+		Return 0
+	End
+	
+End Class
+
+
+
+Function Main:Int()
+
+	New MyApp
+
+	Return 0
+
+End Function
