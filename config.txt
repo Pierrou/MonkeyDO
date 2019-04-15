@@ -1,0 +1,65 @@
+﻿Nom du patient :
+<nom>
+Chemin des tests :
+C:/
+Nombre de tests :
+2
+***Configuration de base des tests 0, 1, 2, 3, 4, 5 [<=> test 1, test 2, test 3, test 4, test 5, test 6]***
+Transition:
+oui|oui|oui|oui|oui|oui
+Temps transition (s) :
+4|4|5|4|4|4
+En boucle:
+oui|oui|oui|oui|oui|oui
+Lecture aléatoire :
+non|non|non|non|non|non
+Son à chaque transition :
+oui|oui|oui|oui|oui|oui
+Son à chaque image :
+non|non|non|non|non|non
+Texte présent :
+oui|non|non|non|non|non
+Texte à afficher :
+CECI EST|<texte>|<texte>|<texte>|<texte>|<texte>
+Texte au-dessus(0) ou en-dessous(1) :
+0|0|0|0|0|0
+Affichage par quadrants :
+non|non|oui|non|non|non
+Quadrant supérieur (0) ou inférieur (1) :
+0|0|0|0|0|0
+Croix :
+non|non|oui|non|non|non
+***Configuration du journal des erreurs***
+Chemin du fichier journal :
+C:\
+Codage des erreurs: 
+Pavé numérique 0 : 
+erreur indéfinie
+Pavé numérique 1 : 
+speech arrest / initiation difficile
+Pavé numérique 2 : 
+réalisation arthrique altérée
+Pavé numérique 3 : 
+prosodie altérée
+Pavé numérique 4 : 
+délai de dénomination
+Pavé numérique 5 : 
+manque du mot
+Pavé numérique 6 : 
+persévération
+Pavé numérique 7 : 
+paraphasie verbale
+Pavé numérique 8 : 
+paraphasie phonémique
+Pavé numérique 9 : 
+paraphasie sémantique
+Pavé numérique . : 
+appariement sémantique : délai / absence de réponse / erreur
+Pavé numérique + :
+mouvement involontaire
+Pavé numérique - :
+arrêt du mouvement
+Pavé numérique * :
+alexie / agraphie
+Pavé numérique / :
+acalculie
