@@ -104,11 +104,9 @@ Class MyApp Extends App
 		Return 0
 	End
 	Method EnregistreDonnees:Int()
-		Print "on enregistre"
 		Local date:Int[] = GetDate()
 		Local pathmodif:String = prefpathlogfile.Replace("/", "\")
 		If Not pathmodif.EndsWith("\") Then pathmodif = pathmodif + "\"
-		Print pathmodif
 		Local nomdefic:String = pathmodif + "donnees_chir_" + date[2] + "-" + date[1] + "-" + date[0] + ".txt"
 		
 		Local file:= FileStream.Open(nomdefic, "a")
@@ -511,42 +509,42 @@ Class MyApp Extends App
 						Local stringstream:String = prefer.ReadString()
 				
 						Local lignelue:String = stringstream.Split(String.FromChar(13) + String.FromChar(10))[32]
-						If lignelue.Contains("|")
+						If lignelue.Contains("|") Or lignelue.Contains("0") Or lignelue.Contains("1") Or lignelue.Contains("2") Or lignelue.Contains("3") Or lignelue.Contains("4") Or lignelue.Contains("5") Or lignelue.Contains("6") Or lignelue.Contains("7") Or lignelue.Contains("8") Or lignelue.Contains("9")
 							For Local ii:Int = 0 To lignelue.Split("|").Length - 1
 								Local numligneadecocher:Int = Int(lignelue.Split("|")[ii])
 								champitems[0].ligne[numligneadecocher].lignecheck.checked = False
 							Next
 						EndIf
 						lignelue = stringstream.Split(String.FromChar(13) + String.FromChar(10))[34]
-						If lignelue.Contains("|")
+						If lignelue.Contains("|") Or lignelue.Contains("0") Or lignelue.Contains("1") Or lignelue.Contains("2") Or lignelue.Contains("3") Or lignelue.Contains("4") Or lignelue.Contains("5") Or lignelue.Contains("6") Or lignelue.Contains("7") Or lignelue.Contains("8") Or lignelue.Contains("9")
 							For Local ii:Int = 0 To lignelue.Split("|").Length - 1
 								Local numligneadecocher:Int = Int(lignelue.Split("|")[ii])
 								champitems[1].ligne[numligneadecocher].lignecheck.checked = False
 							Next
 						EndIf
 						lignelue = stringstream.Split(String.FromChar(13) + String.FromChar(10))[36]
-						If lignelue.Contains("|")
+						If lignelue.Contains("|") Or lignelue.Contains("0") Or lignelue.Contains("1") Or lignelue.Contains("2") Or lignelue.Contains("3") Or lignelue.Contains("4") Or lignelue.Contains("5") Or lignelue.Contains("6") Or lignelue.Contains("7") Or lignelue.Contains("8") Or lignelue.Contains("9")
 							For Local ii:Int = 0 To lignelue.Split("|").Length - 1
 								Local numligneadecocher:Int = Int(lignelue.Split("|")[ii])
 								champitems[2].ligne[numligneadecocher].lignecheck.checked = False
 							Next
 						EndIf
 						lignelue = stringstream.Split(String.FromChar(13) + String.FromChar(10))[38]
-						If lignelue.Contains("|")
+						If lignelue.Contains("|") Or lignelue.Contains("0") Or lignelue.Contains("1") Or lignelue.Contains("2") Or lignelue.Contains("3") Or lignelue.Contains("4") Or lignelue.Contains("5") Or lignelue.Contains("6") Or lignelue.Contains("7") Or lignelue.Contains("8") Or lignelue.Contains("9")
 							For Local ii:Int = 0 To lignelue.Split("|").Length - 1
 								Local numligneadecocher:Int = Int(lignelue.Split("|")[ii])
 								champitems[3].ligne[numligneadecocher].lignecheck.checked = False
 							Next
 						EndIf
 						lignelue = stringstream.Split(String.FromChar(13) + String.FromChar(10))[40]
-						If lignelue.Contains("|")
+						If lignelue.Contains("|") Or lignelue.Contains("0") Or lignelue.Contains("1") Or lignelue.Contains("2") Or lignelue.Contains("3") Or lignelue.Contains("4") Or lignelue.Contains("5") Or lignelue.Contains("6") Or lignelue.Contains("7") Or lignelue.Contains("8") Or lignelue.Contains("9")
 							For Local ii:Int = 0 To lignelue.Split("|").Length - 1
 								Local numligneadecocher:Int = Int(lignelue.Split("|")[ii])
 								champitems[4].ligne[numligneadecocher].lignecheck.checked = False
 							Next
 						EndIf
 						lignelue = stringstream.Split(String.FromChar(13) + String.FromChar(10))[42]
-						If lignelue.Contains("|")
+						If lignelue.Contains("|") Or lignelue.Contains("0") Or lignelue.Contains("1") Or lignelue.Contains("2") Or lignelue.Contains("3") Or lignelue.Contains("4") Or lignelue.Contains("5") Or lignelue.Contains("6") Or lignelue.Contains("7") Or lignelue.Contains("8") Or lignelue.Contains("9")
 							For Local ii:Int = 0 To lignelue.Split("|").Length - 1
 								Local numligneadecocher:Int = Int(lignelue.Split("|")[ii])
 								champitems[5].ligne[numligneadecocher].lignecheck.checked = False
@@ -554,7 +552,6 @@ Class MyApp Extends App
 						EndIf
 						
 						prefpathlogfile = stringstream.Split(String.FromChar(13) + String.FromChar(10))[44]
-						Print prefpathlogfile+ "= bon ou pas?"
 						typeerreurpatient[0] = stringstream.Split(String.FromChar(13) + String.FromChar(10))[47]
 						typeerreurpatient[1] = stringstream.Split(String.FromChar(13) + String.FromChar(10))[49]
 						typeerreurpatient[2] = stringstream.Split(String.FromChar(13) + String.FromChar(10))[51]

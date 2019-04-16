@@ -17,8 +17,6 @@ End
 Function ShuffleTab:Int(tableau:String[]) '
 	Local tabprovisoire:String[] = tableau
 	For Local iiii:Int = 0 To tabprovisoire.Length - 1
-		Print "tabprov " + iiii + " " + tabprovisoire[iiii]
-		Print "tableau "+ iiii+ " "+tableau[iiii]
 	Next
 	tabprovisoire = tabprovisoire[ .. tableau.Length]
 	Local nombreitemsrestants:Int = tabprovisoire.Length 'le nombre d'items encore pas utilisés dans le tableau de base
